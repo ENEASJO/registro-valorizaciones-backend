@@ -8,7 +8,7 @@ Ve a: **Vercel Dashboard > Tu Proyecto > Settings > Environment Variables**
 
 | Variable | Valor | Descripción |
 |----------|--------|-------------|
-| `VITE_BACKEND_URL` | `https://valoraciones-backend-tlsf2bieua-uc.a.run.app` | Backend Cloud Run con Playwright |
+| `VITE_BACKEND_URL` | `https://valoraciones-backend-503600768755.us-central1.run.app` | Backend Cloud Run con Playwright |
 | `VITE_ENVIRONMENT` | `production` | Entorno de producción |
 | `VITE_API_TIMEOUT` | `45000` | Timeout para Playwright (45 segundos) |
 | `VITE_RETRY_ATTEMPTS` | `2` | Número de reintentos |

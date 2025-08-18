@@ -78,18 +78,29 @@ Una vez desplegado, probar estos endpoints:
 
 ### 1. Health Check
 ```bash
-curl https://[SERVICE-URL]/health
+curl https://valoraciones-backend-503600768755.us-central1.run.app/health
 ```
 
 ### 2. Consulta OSCE - Extracción de Consorcios
 ```bash
 # RUC de prueba que funciona localmente
-curl "https://[SERVICE-URL]/consulta-osce/20606881666"
+curl "https://valoraciones-backend-503600768755.us-central1.run.app/consulta-osce/20606881666"
 ```
 
 ### 3. Consulta consolidada (SUNAT + OSCE)
 ```bash
-curl "https://[SERVICE-URL]/consulta-ruc-consolidada/20606881666"
+curl "https://valoraciones-backend-503600768755.us-central1.run.app/consulta-ruc-consolidada/20606881666"
+```
+
+### 4. Gestión de Empresas
+```bash
+# Listar empresas
+curl "https://valoraciones-backend-503600768755.us-central1.run.app/api/empresas"
+
+# Crear empresa
+curl -X POST "https://valoraciones-backend-503600768755.us-central1.run.app/api/empresas" \
+  -H "Content-Type: application/json" \
+  -d '{"ruc":"20606881666","razon_social":"CORPORACION ALLIN RURAJ S.A.C."}'
 ```
 
 ## 🔧 Troubleshooting
