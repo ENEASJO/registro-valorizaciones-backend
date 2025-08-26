@@ -1,0 +1,51 @@
+# FastAPI y dependencias web (Cloud Run completo)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# CORS y middleware
+python-multipart==0.0.6
+
+# Web scraping - Playwright para Cloud Run
+playwright==1.40.0
+
+# Configuración y logging
+python-dotenv==1.0.0
+
+# Utilidades
+typing-extensions==4.8.0
+
+# HTTP client para consultas externas
+httpx==0.25.2
+
+# Database dependencies - Turso
+libsql-client==0.3.0
+
+# Production dependencies para Cloud Run
+gunicorn==21.2.0
+redis==4.6.0
+
+# WhatsApp Business API dependencies
+requests==2.31.0
+aiohttp==3.9.1
+jinja2==3.1.2
+
+# Background tasks and scheduling  
+celery==5.3.4
+kombu==5.3.4
+
+# Time and date utilities
+pytz==2023.3
+python-dateutil==2.8.2
+
+# Data validation and serialization
+phonenumbers==8.13.26
+
+# Database ORM
+sqlalchemy==2.0.23
+alembic==1.13.1
+
+# Additional utilities for async work
+asyncio==3.4.3
+aiofiles==23.2.1
