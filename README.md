@@ -1,6 +1,15 @@
-# Sistema de Valorizaciones - Municipalidad de San Marcos
+# Sistema de Registro de Valorizaciones
 
-Sistema integral para la administración y gestión de valorizaciones de obras públicas municipales, desarrollado específicamente para el Distrito de San Marcos, Provincia de Huari, Región Áncash, Perú.
+Sistema completo para el registro y gestión de valorizaciones de obras, con consulta automática de datos SUNAT/OSCE.
+
+## 📁 Estructura del Monorepo
+
+```
+├── src/                    # Frontend (React + TypeScript)
+├── backend/               # Backend (FastAPI + Python)
+├── package.json          # Dependencias del frontend
+└── README.md            # Este archivo
+```
 
 ## 🏛️ Descripción del Proyecto
 
@@ -59,26 +68,25 @@ El sistema está diseñado específicamente para la estructura territorial del D
 
 ## 🛠️ Tecnologías Utilizadas
 
-### Frontend
+### Frontend (React + TypeScript)
+**Ubicación:** `src/`  
+**Deploy:** Vercel  
+**Puerto local:** 5173
+
 - **React 18** con TypeScript
 - **Vite** para desarrollo y build
 - **Tailwind CSS** para estilos
-- **Framer Motion** para animaciones
-- **Recharts** para visualizaciones
-- **React Router** para navegación
-- **Lucide React** para iconografía
+- **Supabase** para base de datos
 
-### Librerías Especializadas
-- **jsPDF** para generación de PDFs
-- **SheetJS (xlsx)** para exportación Excel
-- **React Hook Form** para manejo de formularios
-- **Zod** para validación de esquemas
+### Backend (FastAPI + Python)
+**Ubicación:** `backend/`  
+**Deploy:** Google Cloud Run  
+**Puerto local:** 8000
 
-### Arquitectura
-- **Componentes modulares** reutilizables
-- **Hooks personalizados** para lógica de negocio
-- **Tipos TypeScript** estrictos
-- **Estructura escalable** por módulos
+- **FastAPI** + Uvicorn
+- **Playwright** para web scraping SUNAT/OSCE
+- **Turso/SQLite** para base de datos
+- **Redis** para caché y optimización
 
 ## 📋 Marco Normativo
 
@@ -93,15 +101,11 @@ El sistema cumple con la normativa peruana:
 ### Prerrequisitos
 ```bash
 Node.js >= 18.0.0
-npm >= 9.0.0
+Python >= 3.9.0
 ```
 
-### Instalación
+### Frontend
 ```bash
-# Clonar el repositorio
-git clone [URL_DEL_REPOSITORIO]
-cd valoraciones-app
-
 # Instalar dependencias
 npm install
 
@@ -109,30 +113,58 @@ npm install
 npm run dev
 ```
 
-### Scripts disponibles
+### Backend
 ```bash
-npm run dev          # Servidor de desarrollo
-npm run build        # Build para producción
-npm run preview      # Preview del build
-npm run lint         # Análisis de código
+cd backend
+
+# Crear entorno virtual (recomendado)
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate   # Windows
+
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Iniciar servidor
+python main.py
 ```
 
-## 📁 Estructura del Proyecto
+### Desarrollo Local
+1. **Backend:** `cd backend && python main.py` (puerto 8000)
+2. **Frontend:** `npm run dev` (puerto 5173)
 
+## 🌐 URLs de Producción
+- **Frontend:** https://registro-valorizaciones.vercel.app
+- **Backend:** https://valoraciones-backend-[hash].a.run.app
+
+## 📁 Estructura Detallada
+
+### Frontend (`src/`)
 ```
 src/
 ├── components/          # Componentes reutilizables
-│   └── layout/         # Layout principal y navegación
 ├── hooks/              # Hooks personalizados
 ├── modules/            # Módulos principales
 │   ├── dashboard/      # Dashboard ejecutivo
-│   ├── empresas/       # Gestión de empresas
+│   ├── empresas/       # Gestión de empresas con consulta RUC
 │   ├── obras/          # Administración de obras
 │   ├── valorizaciones/ # Sistema de valorizaciones
-│   ├── reporte/        # Reportes especializados
-│   └── configuracion/  # Configuración del sistema
+│   └── reporte/        # Reportes especializados
 ├── types/              # Definiciones TypeScript
 └── utils/              # Utilidades y helpers
+```
+
+### Backend (`backend/`)
+```
+backend/
+├── app/
+│   ├── api/routes/     # Endpoints REST
+│   ├── core/          # Configuración y base de datos
+│   ├── models/        # Modelos de datos
+│   ├── services/      # Lógica de negocio
+│   └── utils/         # Utilidades
+├── main.py           # Punto de entrada
+└── requirements.txt  # Dependencias Python
 ```
 
 ## 🎨 Características de UX/UI
