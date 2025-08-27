@@ -453,7 +453,8 @@ async def consultar_ruc_consolidado(ruc: str):
                 razon_social = datos_osce.razon_social
             contacto["email"] = datos_osce.email or ""
             contacto["telefono"] = datos_osce.telefono or ""
-            contacto["direccion"] = datos_osce.direccion or contacto["domicilio_fiscal"]
+            # FIXED: Usar datos_osce.contacto.direccion en lugar de datos_osce.direccion
+            contacto["direccion"] = (datos_osce.contacto.direccion if datos_osce.contacto else "") or contacto["domicilio_fiscal"]
         
         # Consolidar representantes/miembros de ambas fuentes
         miembros = []
@@ -502,7 +503,17 @@ async def consultar_ruc_consolidado(ruc: str):
         # Especialidades de OSCE
         especialidades = []
         if datos_osce and datos_osce.especialidades:
-            especialidades = [esp.nombre for esp in datos_osce.especialidades]
+            # Manejar especialidades como lista de strings o lista de objetos
+            especialidades = []
+            for esp in datos_osce.especialidades:
+                if isinstance(esp, str):
+                    especialidades.append(esp)
+                elif hasattr(esp, 'nombre'):
+                    especialidades.append(esp.nombre)
+                elif hasattr(esp, 'descripcion'):
+                    especialidades.append(esp.descripcion)
+                else:
+                    especialidades.append(str(esp))
         
         # Determinar tipo de persona
         tipo_persona = "NATURAL" if ruc.startswith('10') else "JURIDICA"
