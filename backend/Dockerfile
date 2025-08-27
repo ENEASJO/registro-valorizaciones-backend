@@ -16,6 +16,14 @@ RUN curl -sSLO https://storage.googleapis.com/chrome-for-testing-public/${CFT_VE
  && unzip chrome-linux64.zip -d /opt && rm chrome-linux64.zip \
  && ln -s /opt/chrome-linux64/chrome /usr/local/bin/chrome
 
+# Usuario no-root (necesario antes de crear directorios home)
+RUN useradd --create-home --shell /bin/bash app
+
+# CREAR LA RUTA QUE PLAYWRIGHT ESPERA (como root antes de cambiar usuario)
+RUN mkdir -p /home/app/.cache/ms-playwright/chromium-1091/chrome-linux \
+ && ln -s /opt/chrome-linux64/chrome /home/app/.cache/ms-playwright/chromium-1091/chrome-linux/chrome \
+ && chown -R app:app /home/app/.cache
+
 # Variables de entorno
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     PYTHONUNBUFFERED=1 \
@@ -29,9 +37,8 @@ WORKDIR /app
 COPY requirements-cloudrun.txt .
 RUN pip install --no-cache-dir -r requirements-cloudrun.txt
 
-# Usuario no-root
-RUN useradd --create-home --shell /bin/bash app \
- && chown -R app:app /app
+# Configurar permisos del directorio de trabajo
+RUN chown -R app:app /app
 
 # Copiar código de aplicación
 COPY --chown=app:app . /app/
