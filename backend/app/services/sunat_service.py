@@ -41,27 +41,11 @@ class SUNATService:
         
         logger.info(f"🔍 Consultando RUC: {ruc}")
         
+        from app.utils.playwright_helper import get_browser_launch_options
+
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=settings.HEADLESS_BROWSER,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-gpu',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor',
-                    '--disable-extensions',
-                    '--disable-plugins',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding'
-                ]
-            )
+            launch_options = get_browser_launch_options(headless=settings.HEADLESS_BROWSER)
+            browser = await p.chromium.launch(**launch_options)
             
             context = None
             page = None

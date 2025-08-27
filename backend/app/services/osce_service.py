@@ -48,28 +48,11 @@ class OSCEService:
         logger.info(f"RUC {ruc} validado correctamente")
         print(f"✅ DEBUG: RUC {ruc} validado correctamente")
         
+        from app.utils.playwright_helper import get_browser_launch_options
+
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-gpu',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor',
-                    '--disable-extensions',
-                    '--disable-plugins',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding',
-                    '--disable-blink-features=AutomationControlled'
-                ]
-            )
+            launch_options = get_browser_launch_options(headless=True)
+            browser = await p.chromium.launch(**launch_options)
             
             try:
                 context = await browser.new_context(
