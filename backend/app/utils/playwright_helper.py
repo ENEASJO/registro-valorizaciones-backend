@@ -24,6 +24,9 @@ def get_browser_launch_options(headless: bool = True, custom_args: list = None) 
     if os.path.exists('/opt/chrome-linux64/chrome'):
         chrome_path = '/opt/chrome-linux64/chrome'
         logger.info(f"🐳 Usando Chrome for Testing en Cloud Run: {chrome_path}")
+        # FORZAR variable de entorno para Playwright
+        os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] = chrome_path
+        logger.info(f"🔧 FORZADO: PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH={chrome_path}")
     else:
         logger.info("🖥️ Usando Chromium local en desarrollo")
 
@@ -56,9 +59,10 @@ def get_browser_launch_options(headless: bool = True, custom_args: list = None) 
         'args': base_args
     }
     
-    # Agregar executable_path solo si existe Chrome for Testing
+    # Agregar executable_path Y forzar variable de entorno
     if chrome_path:
         launch_options['executable_path'] = chrome_path
+        logger.info(f"✅ Launch options configuradas con executable_path: {chrome_path}")
         
     return launch_options
 
