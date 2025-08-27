@@ -647,7 +647,14 @@ async def buscar_ruc_impl(ruc: str):
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
-            args=['--no-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled']
+            executable_path="/usr/local/bin/chrome",
+            args=[
+                '--no-sandbox', 
+                '--disable-dev-shm-usage', 
+                '--disable-blink-features=AutomationControlled',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor'
+            ]
         )
         page = await browser.new_page(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36")
         
@@ -1171,6 +1178,7 @@ async def buscar_osce_impl(ruc: str):
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
+            executable_path="/usr/local/bin/chrome",
             args=[
                 '--no-sandbox', 
                 '--disable-dev-shm-usage', 
