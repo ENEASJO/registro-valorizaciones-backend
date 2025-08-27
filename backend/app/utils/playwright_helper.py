@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def get_browser_launch_options(headless: bool = True, custom_args: list = None) -> Dict[str, Any]:
     """
-    Get browser launch options with Chrome for Testing path detection
+    Get browser launch options optimized for Cloud Run
     
     Args:
         headless: Whether to run browser in headless mode
@@ -19,18 +19,9 @@ def get_browser_launch_options(headless: bool = True, custom_args: list = None) 
     Returns:
         Dict with launch options for Playwright
     """
-    # Configurar ruta de Chrome for Testing en Cloud Run
-    chrome_path = None
-    if os.path.exists('/opt/chrome-linux64/chrome'):
-        chrome_path = '/opt/chrome-linux64/chrome'
-        logger.info(f"🐳 Usando Chrome for Testing en Cloud Run: {chrome_path}")
-        # FORZAR variable de entorno para Playwright
-        os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] = chrome_path
-        logger.info(f"🔧 FORZADO: PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH={chrome_path}")
-    else:
-        logger.info("🖥️ Usando Chromium local en desarrollo")
+    logger.info("🚀 Usando Playwright browsers oficiales")
 
-    # Argumentos base para optimización
+    # Argumentos base para optimización en Cloud Run
     base_args = [
         '--no-sandbox',
         '--disable-setuid-sandbox', 
@@ -59,10 +50,7 @@ def get_browser_launch_options(headless: bool = True, custom_args: list = None) 
         'args': base_args
     }
     
-    # Agregar executable_path Y forzar variable de entorno
-    if chrome_path:
-        launch_options['executable_path'] = chrome_path
-        logger.info(f"✅ Launch options configuradas con executable_path: {chrome_path}")
+    logger.info(f"✅ Launch options configuradas para Cloud Run")
         
     return launch_options
 

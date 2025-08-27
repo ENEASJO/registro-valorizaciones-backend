@@ -10,23 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libgbm1 libxss1 libasound2-dev libcairo2 libcairo-gobject2 \
   fonts-liberation && rm -rf /var/lib/apt/lists/*
 
-# Chrome for Testing (126.0.6478.126 funciona)
-ARG CFT_VER=126.0.6478.126
-RUN curl -sSLO https://storage.googleapis.com/chrome-for-testing-public/${CFT_VER}/linux64/chrome-linux64.zip \
- && unzip chrome-linux64.zip -d /opt && rm chrome-linux64.zip \
- && ln -s /opt/chrome-linux64/chrome /usr/local/bin/chrome
-
-# Usuario no-root (necesario antes de crear directorios home)
+# Usuario no-root (necesario para Playwright)
 RUN useradd --create-home --shell /bin/bash app
 
-# CREAR LA RUTA QUE PLAYWRIGHT ESPERA (como root antes de cambiar usuario)
-RUN mkdir -p /home/app/.cache/ms-playwright/chromium-1091/chrome-linux \
- && ln -s /opt/chrome-linux64/chrome /home/app/.cache/ms-playwright/chromium-1091/chrome-linux/chrome \
- && chown -R app:app /home/app/.cache
-
-# Variables de entorno
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-    PYTHONUNBUFFERED=1 \
+# Variables de entorno - PERMITIR que Playwright descargue browsers
+ENV PYTHONUNBUFFERED=1 \
     PORT=8080 \
     BROWSER_HEADLESS=true
 
@@ -36,6 +24,10 @@ WORKDIR /app
 # Copiar y instalar dependencias
 COPY requirements-cloudrun.txt .
 RUN pip install --no-cache-dir -r requirements-cloudrun.txt
+
+# Instalar browsers de Playwright (como root)
+RUN python -m playwright install chromium
+RUN python -m playwright install-deps chromium
 
 # Configurar permisos del directorio de trabajo
 RUN chown -R app:app /app
