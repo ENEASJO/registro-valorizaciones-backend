@@ -27,7 +27,6 @@ RUN pip install --no-cache-dir -r requirements-cloudrun.txt
 
 # Instalar browsers de Playwright (como root)
 RUN python -m playwright install chromium
-RUN python -m playwright install-deps chromium
 
 # Configurar permisos del directorio de trabajo
 RUN chown -R app:app /app
