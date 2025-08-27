@@ -199,8 +199,8 @@ async def create_empresa_temp(empresa: EmpresaCreate):
 async def root():
     db_status = "connected" if DB_AVAILABLE else "disconnected"
     return {
-        "message": "API de Valorizaciones - Cloud Run Completo",
-        "version": "3.0.0",
+        "message": "API de Valorizaciones - Cloud Run Completo ACTUALIZADO",
+        "version": "3.0.1",
         "status": "active",
         "architecture": "Backend Unificado: Playwright + CRUD + Turso",
         "database": f"Turso ({db_status})",
