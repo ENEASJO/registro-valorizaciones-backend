@@ -9,6 +9,7 @@ import logging
 from app.models.ruc import EmpresaInfo, RepresentanteLegal
 from app.core.config import settings
 from app.utils.validators import validate_ruc
+from app.utils.playwright_helper import get_browser_launch_options
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,6 @@ class SUNATService:
         
         logger.info(f"🔍 Consultando RUC: {ruc}")
         
-        from app.utils.playwright_helper import get_browser_launch_options
-
         async with async_playwright() as p:
             launch_options = get_browser_launch_options(headless=settings.HEADLESS_BROWSER)
             browser = await p.chromium.launch(**launch_options)

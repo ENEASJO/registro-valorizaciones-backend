@@ -10,6 +10,7 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 from app.models.osce import EmpresaOSCE, IntegranteOSCE, EspecialidadOSCE, ContactoOSCE
 from app.utils.exceptions import BaseAppException, ValidationException, ExtractionException
 from app.services.osce_service_improved import osce_improved
+from app.utils.playwright_helper import get_browser_launch_options
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,6 @@ class OSCEService:
         logger.info(f"RUC {ruc} validado correctamente")
         print(f"✅ DEBUG: RUC {ruc} validado correctamente")
         
-        from app.utils.playwright_helper import get_browser_launch_options
-
         async with async_playwright() as p:
             launch_options = get_browser_launch_options(headless=True)
             browser = await p.chromium.launch(**launch_options)
