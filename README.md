@@ -1,13 +1,18 @@
-# Sistema de Registro de Valorizaciones
+# Sistema de Registro de Valorizaciones - Monorepo
 
 Sistema completo para el registro y gestión de valorizaciones de obras, con consulta automática de datos SUNAT/OSCE.
 
 ## 📁 Estructura del Monorepo
 
 ```
-├── src/                    # Frontend (React + TypeScript)
-├── backend/               # Backend (FastAPI + Python)
-├── package.json          # Dependencias del frontend
+├── frontend/              # Frontend (React + TypeScript + Vite)
+│   ├── src/              # Código fuente React
+│   ├── package.json      # Dependencias frontend
+│   └── vite.config.ts    # Configuración Vite
+├── backend/              # Backend (FastAPI + Python)
+│   ├── main.py          # API principal
+│   ├── requirements.txt  # Dependencias Python
+│   └── services/        # Servicios SUNAT/OSCE
 └── README.md            # Este archivo
 ```
 
@@ -106,15 +111,19 @@ Python >= 3.9.0
 
 ### Frontend
 ```bash
+# Entrar a carpeta frontend
+cd frontend
+
 # Instalar dependencias
 npm install
 
-# Iniciar servidor de desarrollo
+# Iniciar servidor de desarrollo (Puerto 5173)
 npm run dev
 ```
 
 ### Backend
 ```bash
+# Entrar a carpeta backend
 cd backend
 
 # Crear entorno virtual (recomendado)
