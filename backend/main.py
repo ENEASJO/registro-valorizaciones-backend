@@ -494,57 +494,96 @@ async def consultar_ruc_consolidado(ruc: str):
         fuentes_consultadas = []
         fuentes_con_errores = []
         
-        # Consultar SUNAT
+        # Consultar SUNAT con logging detallado
         try:
             if sunat_service:
+                print(f"🔍 Iniciando consulta SUNAT para RUC: {ruc}")
                 datos_sunat = await sunat_service.consultar_empresa(ruc)
                 fuentes_consultadas.append("SUNAT")
                 print(f"✅ SUNAT consultado exitosamente para RUC: {ruc}")
+                print(f"   📊 Datos SUNAT obtenidos: razon_social={datos_sunat.razon_social[:50] if datos_sunat.razon_social else 'VACIO'}...")
+            else:
+                print(f"⚠️ Servicio SUNAT no disponible")
+                fuentes_con_errores.append("SUNAT: Servicio no disponible")
         except Exception as e:
-            fuentes_con_errores.append(f"SUNAT: {str(e)[:100]}")
-            print(f"❌ Error SUNAT: {e}")
+            error_msg = str(e)
+            fuentes_con_errores.append(f"SUNAT: {error_msg[:100]}")
+            print(f"❌ Error SUNAT detallado: {error_msg}")
+            print(f"   🐛 Tipo de error: {type(e).__name__}")
         
-        # Consultar OSCE
+        # Consultar OSCE con logging detallado
         try:
             if osce_service:
+                print(f"🔍 Iniciando consulta OSCE para RUC: {ruc}")
                 datos_osce = await osce_service.consultar_empresa(ruc)
                 fuentes_consultadas.append("OECE")
                 print(f"✅ OSCE consultado exitosamente para RUC: {ruc}")
+                print(f"   📊 Datos OSCE obtenidos: razon_social={datos_osce.razon_social[:50] if datos_osce.razon_social else 'VACIO'}...")
+                if datos_osce.integrantes:
+                    print(f"   👥 Integrantes encontrados: {len(datos_osce.integrantes)}")
+                if datos_osce.especialidades:
+                    print(f"   🎯 Especialidades encontradas: {len(datos_osce.especialidades)}")
+            else:
+                print(f"⚠️ Servicio OSCE no disponible")
+                fuentes_con_errores.append("OSCE: Servicio no disponible")
         except Exception as e:
-            fuentes_con_errores.append(f"OECE: {str(e)[:100]}")
-            print(f"❌ Error OSCE: {e}")
+            error_msg = str(e)
+            fuentes_con_errores.append(f"OECE: {error_msg[:100]}")
+            print(f"❌ Error OSCE detallado: {error_msg}")
+            print(f"   🐛 Tipo de error: {type(e).__name__}")
         
         # Si Playwright falla, crear respuesta básica con datos del RUC
         if not datos_sunat and not datos_osce:
             print(f"⚠️ Creando respuesta básica para RUC: {ruc}")
             tipo_persona_fallback = "NATURAL" if ruc.startswith('10') else "JURIDICA"
-            datos_basicos = {
-                "ruc": ruc,
-                "razon_social": f"EMPRESA RUC {ruc}",
-                "tipo_persona": tipo_persona_fallback,
-                "contacto": {
-                    "telefono": "",
+            
+            # Crear datos básicos más informativos según el tipo de RUC
+            if tipo_persona_fallback == "NATURAL":
+                # Para persona natural, extraer DNI del RUC
+                dni_from_ruc = ruc[2:10] if len(ruc) == 11 else ""
+                datos_basicos = {
+                    "ruc": ruc,
+                    "razon_social": f"PERSONA NATURAL - RUC {ruc}",
+                    "tipo_persona": tipo_persona_fallback,
+                    "dni": dni_from_ruc,
                     "email": "",
+                    "telefono": "",
                     "direccion": "",
-                    "domicilio_fiscal": ""
-                },
-                "miembros": [],
-                "especialidades": [],
-                "total_miembros": 0,
-                "total_especialidades": 0,
-                "fuentes_consultadas": [],
-                "fuentes_con_errores": fuentes_con_errores,
-                "consolidacion_exitosa": False,
-                "timestamp": datetime.now().isoformat(),
-                "observaciones": ["Datos limitados - servicios de scraping temporalmente no disponibles"]
-            }
+                    "fuentes_consultadas": [],
+                    "consolidacion_exitosa": False,
+                    "timestamp": datetime.now().isoformat(),
+                    "observaciones": ["Servicios de consulta temporalmente no disponibles", "Complete los datos manualmente"]
+                }
+            else:
+                # Para persona jurídica
+                datos_basicos = {
+                    "ruc": ruc,
+                    "razon_social": f"EMPRESA - RUC {ruc}",
+                    "tipo_persona": tipo_persona_fallback,
+                    "contacto": {
+                        "telefono": "",
+                        "email": "",
+                        "direccion": "",
+                        "domicilio_fiscal": ""
+                    },
+                    "miembros": [],
+                    "especialidades": [],
+                    "total_miembros": 0,
+                    "total_especialidades": 0,
+                    "fuentes_consultadas": [],
+                    "fuentes_con_errores": fuentes_con_errores,
+                    "consolidacion_exitosa": False,
+                    "timestamp": datetime.now().isoformat(),
+                    "observaciones": ["Servicios de consulta temporalmente no disponibles", "Complete los datos manualmente"]
+                }
             
             return {
                 "success": True,  # CAMBIO: Devolver success=true para que frontend procese datos básicos
                 "data": datos_basicos,
                 "timestamp": datetime.now().isoformat(),
                 "fuente": "CONSOLIDADO",
-                "version": "3.2.0-fallback"
+                "version": "3.2.0-fallback",
+                "warning": "Servicios de scraping no disponibles - datos básicos generados"
             }
         
         # Consolidar datos
