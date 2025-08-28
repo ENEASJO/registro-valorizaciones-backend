@@ -32,9 +32,8 @@ COPY requirements-cloudrun.txt .
 RUN pip install --no-cache-dir -r requirements-cloudrun.txt
 
 # Instalar browsers de Playwright en el directorio correcto
-# Instalar como root pero en la ubicación accesible por el usuario app
-RUN python -m playwright install chromium && \
-    python -m playwright install-deps chromium
+# Solo el browser, sin las dependencias automáticas (ya instaladas manualmente)
+RUN python -m playwright install chromium
 
 # Copiar código de aplicación
 COPY --chown=app:app . /app/
