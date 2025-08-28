@@ -1,7 +1,7 @@
 steps:
-  # Build the container image from backend directory
+  # Build the container image from current directory
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-f', 'backend/Dockerfile', '-t', 'gcr.io/$PROJECT_ID/registro-valorizaciones:$COMMIT_SHA', 'backend/']
+    args: ['build', '-f', 'Dockerfile', '-t', 'gcr.io/$PROJECT_ID/registro-valorizaciones:$COMMIT_SHA', '.']
     
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
