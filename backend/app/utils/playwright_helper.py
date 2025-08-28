@@ -50,6 +50,25 @@ def get_browser_launch_options(headless: bool = True, custom_args: list = None) 
         'args': base_args
     }
     
+    # En Cloud Run, buscar executable de Chromium instalado por Playwright
+    possible_chrome_paths = [
+        '/root/.cache/ms-playwright/chromium-*/chrome-linux/chrome',
+        '/home/app/.cache/ms-playwright/chromium-*/chrome-linux/chrome',
+        '/app/.cache/ms-playwright/chromium-*/chrome-linux/chrome'
+    ]
+    
+    import glob
+    for path_pattern in possible_chrome_paths:
+        matches = glob.glob(path_pattern)
+        if matches:
+            chrome_path = matches[0]
+            if os.path.exists(chrome_path):
+                launch_options['executable_path'] = chrome_path
+                logger.info(f"✅ Chrome encontrado en: {chrome_path}")
+                break
+    else:
+        logger.warning("⚠️ No se encontró Chrome, usando configuración por defecto")
+    
     logger.info(f"✅ Launch options configuradas para Cloud Run")
         
     return launch_options
