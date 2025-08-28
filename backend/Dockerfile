@@ -1,4 +1,4 @@
-# Dockerfile ultra-optimizado para Cloud Run - Chrome for Testing
+# Dockerfile ultra-optimizado para Cloud Run - Chrome for Testing (Fixed)
 FROM python:3.11-slim
 
 # Librerías optimizadas para Chrome/Playwright en Cloud Run
