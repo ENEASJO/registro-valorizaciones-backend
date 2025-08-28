@@ -277,6 +277,87 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
+# Endpoint de diagnóstico de scraping
+@app.get("/debug/playwright-status")
+async def debug_playwright_status():
+    """Endpoint para diagnosticar el estado de Playwright y los servicios de scraping"""
+    
+    try:
+        print("🔍 Iniciando diagnóstico de Playwright...")
+        
+        # Importar y verificar helper
+        from app.utils.playwright_helper import get_browser_launch_options, find_chrome_executable, is_cloud_run_environment
+        
+        diagnostic_info = {
+            "timestamp": datetime.now().isoformat(),
+            "cloud_run_detected": is_cloud_run_environment(),
+            "playwright_helper_available": PLAYWRIGHT_HELPER_AVAILABLE,
+            "chrome_executable": find_chrome_executable(),
+            "launch_options": get_browser_launch_options(headless=True),
+            "services_status": {
+                "sunat_service": None,
+                "osce_service": None
+            },
+            "playwright_test": None,
+            "environment_vars": {
+                "K_SERVICE": os.environ.get("K_SERVICE", "Not set"),
+                "K_CONFIGURATION": os.environ.get("K_CONFIGURATION", "Not set"), 
+                "PORT": os.environ.get("PORT", "Not set")
+            }
+        }
+        
+        # Test services creation
+        try:
+            from app.services.sunat_service import SUNATService
+            sunat_service = SUNATService()
+            diagnostic_info["services_status"]["sunat_service"] = "✅ Created successfully"
+        except Exception as e:
+            diagnostic_info["services_status"]["sunat_service"] = f"❌ Error: {str(e)}"
+            
+        try:
+            from app.services.osce_service import OSCEService
+            osce_service = OSCEService()
+            diagnostic_info["services_status"]["osce_service"] = "✅ Created successfully"
+        except Exception as e:
+            diagnostic_info["services_status"]["osce_service"] = f"❌ Error: {str(e)}"
+        
+        # Test basic Playwright functionality
+        try:
+            print("🧪 Probando Playwright básico...")
+            async with async_playwright() as p:
+                if PLAYWRIGHT_HELPER_AVAILABLE:
+                    launch_options = get_browser_launch_options(headless=True)
+                    browser = await p.chromium.launch(**launch_options)
+                else:
+                    browser = await p.chromium.launch(headless=True)
+                
+                page = await browser.new_page()
+                await page.goto("data:text/html,<html><body><h1>Test</h1></body></html>", timeout=10000)
+                title = await page.title()
+                await browser.close()
+                
+                diagnostic_info["playwright_test"] = f"✅ Basic test passed - Title: {title}"
+                print("✅ Playwright básico funcionando")
+                
+        except Exception as e:
+            diagnostic_info["playwright_test"] = f"❌ Playwright test failed: {str(e)}"
+            print(f"❌ Error en test Playwright: {e}")
+        
+        return {
+            "success": True,
+            "message": "Diagnóstico completado",
+            "data": diagnostic_info
+        }
+        
+    except Exception as e:
+        print(f"❌ Error en diagnóstico: {e}")
+        return {
+            "success": False,
+            "error": True,
+            "message": f"Error en diagnóstico: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
 class RUCInput(BaseModel):
     ruc: str
 
