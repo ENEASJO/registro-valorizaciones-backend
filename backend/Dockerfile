@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libpango-1.0-0 libnss3 libxcb1 libx11-6 libxext6 libxi6 libxcursor1 \
   libgbm1 libxss1 libcairo2 libcairo-gobject2 \
   fonts-liberation libgtk-3-0 libgdk-pixbuf-2.0-0 libgdk-pixbuf2.0-common \
-  libgconf-2-4 libgconf2-4 \
   && rm -rf /var/lib/apt/lists/*
 
 # Usuario no-root (necesario para Playwright)
