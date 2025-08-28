@@ -16,7 +16,8 @@ RUN useradd --create-home --shell /bin/bash app
 # Variables de entorno - PERMITIR que Playwright descargue browsers
 ENV PYTHONUNBUFFERED=1 \
     PORT=8080 \
-    BROWSER_HEADLESS=true
+    BROWSER_HEADLESS=true \
+    PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 
 # Crear directorio de trabajo
 WORKDIR /app
