@@ -323,14 +323,38 @@ async def buscar(data: RUCInput):
 # Agregar endpoint compatible con el frontend - REHABILITADO
 @app.get("/consulta-ruc/{ruc}")
 async def consultar_ruc(ruc: str):
-    """Endpoint para consulta individual de RUC - usa extracción SUNAT"""
+    """Endpoint para consulta individual de RUC - usa servicio SUNAT mejorado"""
     try:
-        resultado = await buscar_ruc_impl(ruc)
-        return resultado
+        print(f"🔍 Consultando RUC con servicio SUNAT mejorado: {ruc}")
+        
+        # Usar el servicio SUNAT clean con datos limpios
+        from app.services.sunat_service_clean import sunat_service_clean
+        resultado = await sunat_service_clean.consultar_empresa(ruc)
+        
+        return {
+            "error": False,
+            "message": f"✅ SUNAT consultado exitosamente para RUC: {ruc}",
+            "ruc": ruc,
+            "razon_social": resultado.razon_social,
+            "domicilio_fiscal": resultado.domicilio_fiscal,
+            "representantes": [
+                {
+                    "nombre": rep.nombre,
+                    "cargo": rep.cargo,
+                    "tipo_documento": rep.tipo_doc,
+                    "numero_documento": rep.numero_doc,
+                    "fecha_desde": rep.fecha_desde
+                }
+                for rep in resultado.representantes
+            ],
+            "fuente": "SUNAT",
+            "timestamp": datetime.now().isoformat()
+        }
     except Exception as e:
+        print(f"❌ Error SUNAT: {str(e)}")
         return {
             "error": True,
-            "message": f"Error al consultar: {str(e)}",
+            "message": f"Error al consultar SUNAT: {str(e)}",
             "ruc": ruc,
             "timestamp": datetime.now().isoformat()
         }
