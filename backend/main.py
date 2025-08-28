@@ -26,6 +26,15 @@ except ImportError as e:
         router = None
     ruc = osce = mcp = obras = valorizaciones = notifications = DummyRouter()
 
+# Import Playwright helper for optimized browser configuration
+try:
+    from app.utils.playwright_helper import get_browser_launch_options
+    PLAYWRIGHT_HELPER_AVAILABLE = True
+    print("🌐 Playwright helper loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Playwright helper not available: {e}")
+    PLAYWRIGHT_HELPER_AVAILABLE = False
+
 # from app.api.routes import empresas  # Temporarily disabled until dependencies are installed
 
 # Try to import MCP database, but make it optional
@@ -645,17 +654,22 @@ async def buscar_ruc_impl(ruc: str):
         return {"error": True, "message": "RUC debe comenzar con 10 (persona natural) o 20 (persona jurídica)"}
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            executable_path="/usr/local/bin/chrome",
-            args=[
-                '--no-sandbox', 
-                '--disable-dev-shm-usage', 
-                '--disable-blink-features=AutomationControlled',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor'
-            ]
-        )
+        # Use optimized browser configuration if available
+        if PLAYWRIGHT_HELPER_AVAILABLE:
+            launch_options = get_browser_launch_options(headless=True)
+            browser = await p.chromium.launch(**launch_options)
+        else:
+            # Fallback to basic configuration
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox', 
+                    '--disable-dev-shm-usage', 
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
+                ]
+            )
         page = await browser.new_page(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36")
         
         try:
@@ -1176,17 +1190,22 @@ async def buscar_osce_impl(ruc: str):
         print(f"⚠️ RUC con formato inusual: {ruc}")
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            executable_path="/usr/local/bin/chrome",
-            args=[
-                '--no-sandbox', 
-                '--disable-dev-shm-usage', 
-                '--disable-blink-features=AutomationControlled',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor'
-            ]
-        )
+        # Use optimized browser configuration if available
+        if PLAYWRIGHT_HELPER_AVAILABLE:
+            launch_options = get_browser_launch_options(headless=True)
+            browser = await p.chromium.launch(**launch_options)
+        else:
+            # Fallback to basic configuration
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox', 
+                    '--disable-dev-shm-usage', 
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
+                ]
+            )
         
         try:
             context = await browser.new_context(

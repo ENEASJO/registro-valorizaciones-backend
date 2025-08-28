@@ -1,14 +1,15 @@
 # Dockerfile ultra-optimizado para Cloud Run - Chrome for Testing
 FROM python:3.11-slim
 
-# Todas las librerías necesarias para Chrome
+# Todas las librerías necesarias para Chrome y Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  ca-certificates curl unzip \
+  ca-certificates curl unzip wget gnupg \
   libasound2 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
   libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxrender1 libxkbcommon0 \
   libpango-1.0-0 libnss3 libxcb1 libx11-6 libxext6 libxi6 \
   libgbm1 libxss1 libasound2-dev libcairo2 libcairo-gobject2 \
-  fonts-liberation && rm -rf /var/lib/apt/lists/*
+  fonts-liberation libgtk-3-0 libgdk-pixbuf2.0-0 \
+  && rm -rf /var/lib/apt/lists/*
 
 # Usuario no-root (necesario para Playwright)
 RUN useradd --create-home --shell /bin/bash app
@@ -17,20 +18,23 @@ RUN useradd --create-home --shell /bin/bash app
 ENV PYTHONUNBUFFERED=1 \
     PORT=8080 \
     BROWSER_HEADLESS=true \
-    PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+    PLAYWRIGHT_BROWSERS_PATH=/app/.cache/ms-playwright
 
 # Crear directorio de trabajo
 WORKDIR /app
+
+# Crear directorio para Playwright browsers con permisos correctos
+RUN mkdir -p /app/.cache/ms-playwright && \
+    chown -R app:app /app
 
 # Copiar y instalar dependencias
 COPY requirements-cloudrun.txt .
 RUN pip install --no-cache-dir -r requirements-cloudrun.txt
 
-# Instalar browsers de Playwright (como root)
-RUN python -m playwright install chromium
-
-# Configurar permisos del directorio de trabajo
-RUN chown -R app:app /app
+# Instalar browsers de Playwright en el directorio correcto
+# Instalar como root pero en la ubicación accesible por el usuario app
+RUN python -m playwright install chromium && \
+    python -m playwright install-deps chromium
 
 # Copiar código de aplicación
 COPY --chown=app:app . /app/
