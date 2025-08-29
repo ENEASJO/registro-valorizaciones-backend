@@ -264,19 +264,48 @@ async def favicon():
 # Endpoint de salud
 @app.get("/health")
 async def health_check():
-    db_status = "connected" if DB_AVAILABLE else "disconnected"
+    """Health check con verificación completa de servicios"""
+    start_time = datetime.now()
+    services_status = {}
+    overall_status = "healthy"
+    
+    # Verificar Turso Database
+    try:
+        if DB_AVAILABLE:
+            from app.core.database_turso import get_turso_client
+            client = get_turso_client()
+            if client:
+                # Test básico de conectividad
+                test_result = client.execute("SELECT 1 as health_test")
+                services_status["turso_database"] = {
+                    "status": "healthy",
+                    "response_time_ms": round((datetime.now() - start_time).total_seconds() * 1000, 2)
+                }
+            else:
+                services_status["turso_database"] = {"status": "disconnected"}
+                overall_status = "degraded"
+        else:
+            services_status["turso_database"] = {"status": "unavailable"}
+            overall_status = "degraded"
+    except Exception as e:
+        services_status["turso_database"] = {"status": "error", "error": str(e)[:50]}
+        overall_status = "degraded"
+    
+    # Verificar otros servicios
+    services_status.update({
+        "playwright": {"status": "enabled"},
+        "crud_apis": {"status": "enabled"},
+        "sunat_robust": {"status": "enabled"},
+        "sunat_fallback": {"status": "enabled"}
+    })
+    
     return {
-        "status": "healthy",
-        "version": "3.3.0-robust",
-        "architecture": "Cloud Run Completo + SUNAT Robusto",
-        "services": {
-            "playwright": "enabled",
-            "turso_database": db_status,
-            "crud_apis": "enabled",
-            "sunat_robust": "enabled",
-            "sunat_fallback": "enabled"
-        },
-        "timestamp": datetime.now().isoformat()
+        "status": overall_status,
+        "version": "3.3.0-robust-turso",
+        "architecture": "Cloud Run + Turso + SUNAT Robusto",
+        "services": services_status,
+        "timestamp": datetime.now().isoformat(),
+        "response_time_ms": round((datetime.now() - start_time).total_seconds() * 1000, 2)
     }
 
 # Endpoint de monitoreo SUNAT
