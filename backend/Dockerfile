@@ -26,14 +26,16 @@ WORKDIR /app
 RUN mkdir -p /app/.cache/ms-playwright && \
     chown -R app:app /app
 
-# Instalar dependencias de Python
-RUN pip install fastapi uvicorn playwright python-dotenv
+# Copiar e instalar dependencias de Python
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
 
 # Instalar browsers de Playwright
 RUN python -m playwright install chromium
 
-# Copiar aplicación
+# Copiar aplicación completa con servicios
 COPY main.py main.py
+COPY app/ app/
 
 # Cambiar a usuario no-root
 USER app

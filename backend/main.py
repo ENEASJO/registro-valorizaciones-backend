@@ -11,7 +11,7 @@ from typing import Dict, Any
 app = FastAPI(
     title="API de Valorizaciones - Inicio Rápido", 
     description="Backend con Playwright lazy loading para inicio rápido",
-    version="3.5.0"
+    version="4.0.0"
 )
 
 # CORS básico
@@ -199,14 +199,83 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
             "timestamp": datetime.now().isoformat()
         }
 
-# Endpoint GET para compatibilidad con frontend (redirige a POST)
+# Endpoint GET consolidado SUNAT + OSCE (funcionalidad completa restaurada)
 @app.get("/consulta-ruc-consolidada/{ruc}")
-async def consultar_ruc_get(ruc: str):
-    """Endpoint GET para compatibilidad - redirige al endpoint POST"""
-    # Crear el objeto RUCInput internamente
-    ruc_input = RUCInput(ruc=ruc)
-    # Llamar al endpoint POST existente
-    return await consultar_ruc_sunat(ruc_input)
+async def consultar_ruc_consolidado(ruc: str):
+    """Consulta consolidada de SUNAT + OSCE - FUNCIONALIDAD COMPLETA"""
+    print(f"🔍 Iniciando consulta consolidada para RUC: {ruc}")
+    
+    # Validación básica
+    if not ruc or len(ruc) != 11 or not ruc.isdigit():
+        return {
+            "success": False,
+            "error": True,
+            "message": "RUC debe tener 11 dígitos numéricos",
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    try:
+        # Importar el servicio de consolidación dinámicamente
+        from app.services.consolidation_service import ConsolidationService
+        
+        print("📦 Servicio de consolidación importado dinámicamente")
+        
+        # Crear instancia del servicio
+        consolidation_service = ConsolidationService()
+        
+        # Consultar datos consolidados
+        resultado_consolidado = await consolidation_service.consultar_consolidado(ruc)
+        
+        print("✅ Consulta consolidada completada exitosamente")
+        
+        return {
+            "success": True,
+            "data": {
+                "ruc": resultado_consolidado.ruc,
+                "razon_social": resultado_consolidado.razon_social,
+                "estado": resultado_consolidado.estado,
+                "direccion": resultado_consolidado.direccion,
+                "departamento": resultado_consolidado.departamento,
+                "provincia": resultado_consolidado.provincia,
+                "distrito": resultado_consolidado.distrito,
+                "fuentes": resultado_consolidado.fuentes,
+                "representantes": [
+                    {
+                        "nombre": repr.nombre,
+                        "cargo": repr.cargo,
+                        "documento": repr.documento,
+                        "fuente": repr.fuente
+                    } for repr in resultado_consolidado.representantes
+                ] if resultado_consolidado.representantes else [],
+                "contactos": [
+                    {
+                        "telefono": cont.telefono,
+                        "email": cont.email,
+                        "fuente": cont.fuente
+                    } for cont in resultado_consolidado.contactos
+                ] if resultado_consolidado.contactos else [],
+                "consolidacion_exitosa": True,
+                "fuente": "CONSOLIDADO_SUNAT_OSCE"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except ImportError as import_error:
+        print(f"⚠️ Error importando servicio de consolidación: {import_error}")
+        # Fallback al endpoint SUNAT simple si no está disponible la consolidación
+        ruc_input = RUCInput(ruc=ruc)
+        resultado_simple = await consultar_ruc_sunat(ruc_input)
+        resultado_simple["data"]["fuente"] = "SUNAT_FALLBACK"
+        return resultado_simple
+        
+    except Exception as e:
+        print(f"❌ Error en consulta consolidada: {e}")
+        return {
+            "success": False,
+            "error": True,
+            "message": f"Error en consulta consolidada: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
 
 # Test de Playwright (lazy loading)
 @app.get("/debug/playwright-test")
