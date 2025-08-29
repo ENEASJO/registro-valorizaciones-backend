@@ -23,7 +23,7 @@ steps:
     - '--cpu=2'
     - '--timeout=900s'
     - '--max-instances=10'
-    - '--startup-timeout=600'
+    - '--startup-cpu-boost'
     - '--set-env-vars=DEBUG=false,LOG_LEVEL=INFO,HOST=0.0.0.0,TURSO_DATABASE_URL=$(TURSO_DATABASE_URL),TURSO_AUTH_TOKEN=$(TURSO_AUTH_TOKEN)'
 
 images:
