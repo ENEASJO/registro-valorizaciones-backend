@@ -11,7 +11,7 @@ WORKDIR /app
 RUN pip install fastapi uvicorn
 
 # Copiar aplicación
-COPY main.py main.py
+COPY main_working.py main.py
 
 # Exponer puerto
 EXPOSE 8080
