@@ -35,9 +35,6 @@ RUN python -m playwright install chromium
 # Copiar aplicación
 COPY main.py main.py
 
-# Copiar utils si existe (opcional)
-COPY app/ app/ 2>/dev/null || true
-
 # Cambiar a usuario no-root
 USER app
 
