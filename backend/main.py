@@ -11,7 +11,7 @@ from typing import Dict, Any
 app = FastAPI(
     title="API de Valorizaciones - Inicio Rápido", 
     description="Backend con Playwright lazy loading para inicio rápido",
-    version="4.0.1"
+    version="4.0.2"
 )
 
 # CORS básico
