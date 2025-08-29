@@ -2515,4 +2515,118 @@ async def eliminar_empresa_guardada(ruc: str):
             "error": str(e),
             "ruc": ruc,
             "timestamp": datetime.now().isoformat()
-        }
+        }# =====================================================================
+# ENDPOINTS TEMPORALES PARA COMPATIBILIDAD CON FRONTEND
+# =====================================================================
+
+endpoints_temp_code = """
+
+@app.get("/obras")
+async def listar_obras_temp():
+    \"\"\"Endpoint temporal para obras - compatibilidad frontend\"\"\"
+    return {
+        "success": True,
+        "data": [],
+        "message": "Endpoint obras temporal - sin datos",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.post("/obras")
+async def crear_obra_temp(data: dict):
+    \"\"\"Endpoint temporal para crear obras\"\"\"
+    return {
+        "success": True,
+        "data": {"id": 1, **data},
+        "message": "Obra creada (temporal)",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/valorizaciones")
+async def listar_valorizaciones_temp():
+    \"\"\"Endpoint temporal para valorizaciones - compatibilidad frontend\"\"\"
+    return {
+        "success": True,
+        "data": [],
+        "message": "Endpoint valorizaciones temporal - sin datos",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.post("/valorizaciones")
+async def crear_valorizacion_temp(data: dict):
+    \"\"\"Endpoint temporal para crear valorizaciones\"\"\"
+    return {
+        "success": True,
+        "data": {"id": 1, **data},
+        "message": "Valorización creada (temporal)",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/empresas-guardadas")
+async def listar_empresas_guardadas_temp():
+    \"\"\"Endpoint temporal para empresas guardadas - compatibilidad frontend\"\"\"
+    return {
+        "success": True,
+        "data": saved_empresas,
+        "total": len(saved_empresas),
+        "message": "Empresas guardadas temporal",
+        "timestamp": datetime.now().isoformat()
+    }
+
+"""
+# Agregar endpoints temporales
+exec(endpoints_temp_code)
+
+# =====================================================================
+# ENDPOINTS TEMPORALES PARA COMPATIBILIDAD CON FRONTEND
+# =====================================================================
+
+@app.get("/obras")
+async def listar_obras_temp():
+    """Endpoint temporal para obras - compatibilidad frontend"""
+    return {
+        "success": True,
+        "data": [],
+        "message": "Endpoint obras temporal - sin datos",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.post("/obras")
+async def crear_obra_temp(data: dict):
+    """Endpoint temporal para crear obras"""
+    return {
+        "success": True,
+        "data": {"id": 1, **data},
+        "message": "Obra creada (temporal)",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/valorizaciones")
+async def listar_valorizaciones_temp():
+    """Endpoint temporal para valorizaciones - compatibilidad frontend"""
+    return {
+        "success": True,
+        "data": [],
+        "message": "Endpoint valorizaciones temporal - sin datos",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.post("/valorizaciones")
+async def crear_valorizacion_temp(data: dict):
+    """Endpoint temporal para crear valorizaciones"""
+    return {
+        "success": True,
+        "data": {"id": 1, **data},
+        "message": "Valorización creada (temporal)",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/empresas-guardadas")
+async def listar_empresas_guardadas_temp():
+    """Endpoint temporal para empresas guardadas - compatibilidad frontend"""
+    return {
+        "success": True,
+        "data": saved_empresas,
+        "total": len(saved_empresas),
+        "message": "Empresas guardadas temporal",
+        "timestamp": datetime.now().isoformat()
+    }
