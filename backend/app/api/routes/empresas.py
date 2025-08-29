@@ -1,41 +1,85 @@
 """
-API endpoints para gestión de empresas
+API endpoints para gestión de empresas (usando Turso)
 """
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Query, status
 from datetime import datetime
+import re
 
-from app.core.database import get_db_session
-from app.services.empresa_service import EmpresaService
+from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
 from app.models.empresa import (
     EmpresaCreateSchema,
     EmpresaResponse,
-    EmpresaListResponse
+    EmpresaListResponse,
+    RepresentanteResponse
 )
 
 router = APIRouter(prefix="/api/v1/empresas", tags=["empresas"])
 
+# Instancia del servicio Turso
+empresa_service = EmpresaServiceTurso()
+
+def validar_ruc(ruc: str) -> bool:
+    """Validar formato de RUC"""
+    if not ruc or len(ruc) != 11:
+        return False
+    if not ruc.isdigit():
+        return False
+    if not (ruc.startswith('10') or ruc.startswith('20')):
+        return False
+    return True
+
+def convertir_empresa_dict_a_response(empresa_dict: Dict[str, Any]) -> EmpresaResponse:
+    """Convertir diccionario de empresa de Turso a EmpresaResponse"""
+    return EmpresaResponse(
+        id=empresa_dict.get('id', 0),
+        codigo=empresa_dict.get('codigo', ''),
+        ruc=empresa_dict.get('ruc', ''),
+        razon_social=empresa_dict.get('razon_social', ''),
+        nombre_comercial=empresa_dict.get('nombre_comercial'),
+        email=empresa_dict.get('email'),
+        telefono=empresa_dict.get('telefono'),
+        celular=empresa_dict.get('celular'),
+        direccion=empresa_dict.get('direccion'),
+        representante_legal=empresa_dict.get('representante_legal'),
+        dni_representante=empresa_dict.get('dni_representante'),
+        estado=empresa_dict.get('estado', 'ACTIVO'),
+        tipo_empresa=empresa_dict.get('tipo_empresa', 'SAC'),
+        categoria_contratista=empresa_dict.get('categoria_contratista'),
+        especialidades=empresa_dict.get('especialidades', []),
+        representantes=[],  # Por ahora vacío, se puede extender
+        total_representantes=0,
+        activo=bool(empresa_dict.get('activo', True)),
+        created_at=datetime.fromisoformat(empresa_dict.get('created_at', datetime.now().isoformat())),
+        updated_at=datetime.fromisoformat(empresa_dict.get('updated_at', datetime.now().isoformat()))
+    )
+
 @router.post("/", response_model=EmpresaResponse, status_code=status.HTTP_201_CREATED)
 async def crear_empresa(
-    empresa_data: EmpresaCreateSchema,
-    db: AsyncSession = Depends(get_db_session)
+    empresa_data: EmpresaCreateSchema
 ):
     """
-    Crear nueva empresa con todos sus representantes
+    Crear nueva empresa con todos sus representantes usando Turso
     
     Este endpoint:
-    1. Crea la empresa con los datos básicos
-    2. Guarda TODOS los representantes obtenidos de SUNAT/OECE
-    3. Marca cual es el representante principal
-    4. Asigna el representante principal como representante legal de la empresa
+    1. Valida el RUC y los representantes
+    2. Crea la empresa en Turso
+    3. Retorna la empresa creada
     """
     try:
         # Validar RUC
-        if not EmpresaService.validar_ruc(empresa_data.ruc):
+        if not validar_ruc(empresa_data.ruc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="RUC inválido. Debe tener 11 dígitos y comenzar con 10 o 20"
+            )
+        
+        # Verificar si ya existe
+        empresa_existente = empresa_service.get_empresa_by_ruc(empresa_data.ruc)
+        if empresa_existente:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ya existe una empresa con este RUC"
             )
         
         # Validar que tenga al menos un representante
@@ -53,20 +97,49 @@ async def crear_empresa(
                 detail="Índice de representante principal inválido"
             )
         
-        # Crear empresa
-        nueva_empresa = await EmpresaService.crear_empresa_con_representantes(
-            session=db,
-            empresa_data=empresa_data,
-            created_by=1  # TODO: Obtener de autenticación
+        # Preparar datos para crear empresa
+        representante_principal = empresa_data.representantes[empresa_data.representante_principal_id]
+        
+        datos_empresa = {
+            'data': {
+                'razon_social': empresa_data.razon_social,
+                'contacto': {
+                    'email': empresa_data.email or '',
+                    'telefono': empresa_data.celular or '',
+                    'direccion': empresa_data.direccion or ''
+                },
+                'miembros': [{
+                    'nombre': representante_principal.nombre,
+                    'numero_documento': representante_principal.numero_documento,
+                    'cargo': representante_principal.cargo
+                }]
+            }
+        }
+        
+        # Crear empresa en Turso
+        empresa_id = empresa_service.save_empresa_from_consulta(
+            ruc=empresa_data.ruc,
+            datos_consulta=datos_empresa
         )
         
-        return nueva_empresa
+        if not empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error creando empresa en la base de datos"
+            )
         
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        # Obtener empresa creada para retornar
+        empresa_creada = empresa_service.get_empresa_by_ruc(empresa_data.ruc)
+        if not empresa_creada:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error obteniendo empresa creada"
+            )
+        
+        return convertir_empresa_dict_a_response(empresa_creada)
+        
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -75,12 +148,14 @@ async def crear_empresa(
 
 @router.get("/{empresa_id}", response_model=EmpresaResponse)
 async def obtener_empresa(
-    empresa_id: int,
-    db: AsyncSession = Depends(get_db_session)
+    empresa_id: int
 ):
-    """Obtener empresa por ID con todos sus representantes"""
+    """Obtener empresa por ID usando Turso"""
     try:
-        empresa = await EmpresaService.obtener_empresa_por_id(db, empresa_id)
+        # Por ahora, listar todas y filtrar por ID
+        # En una implementación más completa se haría una consulta directa por ID
+        empresas = empresa_service.list_empresas(limit=1000)
+        empresa = next((e for e in empresas if e.get('id') == empresa_id), None)
         
         if not empresa:
             raise HTTPException(
@@ -88,7 +163,7 @@ async def obtener_empresa(
                 detail="Empresa no encontrada"
             )
         
-        return empresa
+        return convertir_empresa_dict_a_response(empresa)
         
     except HTTPException:
         raise
@@ -100,18 +175,17 @@ async def obtener_empresa(
 
 @router.get("/ruc/{ruc}", response_model=EmpresaResponse)
 async def obtener_empresa_por_ruc(
-    ruc: str,
-    db: AsyncSession = Depends(get_db_session)
+    ruc: str
 ):
-    """Obtener empresa por RUC con todos sus representantes"""
+    """Obtener empresa por RUC usando Turso"""
     try:
-        if not EmpresaService.validar_ruc(ruc):
+        if not validar_ruc(ruc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="RUC inválido"
             )
         
-        empresa = await EmpresaService.obtener_empresa_por_ruc(db, ruc)
+        empresa = empresa_service.get_empresa_by_ruc(ruc)
         
         if not empresa:
             raise HTTPException(
@@ -119,7 +193,7 @@ async def obtener_empresa_por_ruc(
                 detail="Empresa no encontrada con el RUC proporcionado"
             )
         
-        return empresa
+        return convertir_empresa_dict_a_response(empresa)
         
     except HTTPException:
         raise
@@ -134,23 +208,46 @@ async def listar_empresas(
     page: int = Query(1, ge=1, description="Número de página"),
     per_page: int = Query(20, ge=1, le=100, description="Elementos por página"),
     search: Optional[str] = Query(None, description="Buscar por razón social, RUC o representante"),
-    estado: Optional[str] = Query(None, description="Filtrar por estado"),
-    db: AsyncSession = Depends(get_db_session)
+    estado: Optional[str] = Query(None, description="Filtrar por estado")
 ):
-    """Listar empresas con filtros y paginación"""
+    """Listar empresas con filtros y paginación usando Turso"""
     try:
-        resultado = await EmpresaService.listar_empresas(
-            session=db,
-            page=page,
-            per_page=per_page,
-            search=search,
-            estado=estado
-        )
+        # Calcular offset
+        offset = (page - 1) * per_page
+        
+        # Si hay búsqueda, usar el método de búsqueda
+        if search:
+            empresas_raw = empresa_service.search_empresas(search, limit=per_page * 5)  # Más resultados para filtrar
+        else:
+            empresas_raw = empresa_service.list_empresas(limit=per_page * 5, offset=offset)
+        
+        # Filtrar por estado si se especifica
+        if estado:
+            empresas_raw = [e for e in empresas_raw if e.get('estado', '').upper() == estado.upper()]
+        
+        # Aplicar paginación manual si fue búsqueda
+        if search:
+            total = len(empresas_raw)
+            empresas_raw = empresas_raw[offset:offset + per_page]
+        else:
+            # Para listado normal, asumir que puede haber más
+            total = len(empresas_raw) + (per_page if len(empresas_raw) == per_page else 0)
+        
+        # Convertir a formato de respuesta
+        empresas = [convertir_empresa_dict_a_response(emp) for emp in empresas_raw]
+        
+        resultado = {
+            "empresas": empresas,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page
+        }
         
         return {
             "success": True,
             "data": resultado,
-            "message": f"Se encontraron {resultado['total']} empresa(s)"
+            "message": f"Se encontraron {total} empresa(s)"
         }
         
     except Exception as e:
@@ -162,71 +259,33 @@ async def listar_empresas(
 @router.put("/{empresa_id}", response_model=EmpresaResponse)
 async def actualizar_empresa(
     empresa_id: int,
-    empresa_data: Dict[str, Any],
-    db: AsyncSession = Depends(get_db_session)
+    empresa_data: Dict[str, Any]
 ):
-    """Actualizar datos de empresa existente"""
-    try:
-        empresa_actualizada = await EmpresaService.actualizar_empresa(
-            session=db,
-            empresa_id=empresa_id,
-            empresa_data=empresa_data,
-            updated_by=1  # TODO: Obtener de autenticación
-        )
-        
-        if not empresa_actualizada:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Empresa no encontrada"
-            )
-        
-        return empresa_actualizada
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error interno del servidor: {str(e)}"
-        )
+    """Actualizar datos de empresa existente (No implementado en Turso)"""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Actualización de empresas no implementada en la versión Turso"
+    )
 
 @router.delete("/{empresa_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def eliminar_empresa(
-    empresa_id: int,
-    db: AsyncSession = Depends(get_db_session)
+    empresa_id: int
 ):
-    """Eliminar empresa (eliminación lógica)"""
-    try:
-        eliminada = await EmpresaService.eliminar_empresa(
-            session=db,
-            empresa_id=empresa_id,
-            deleted_by=1  # TODO: Obtener de autenticación
-        )
-        
-        if not eliminada:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Empresa no encontrada"
-            )
-        
-        return None
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error interno del servidor: {str(e)}"
-        )
+    """Eliminar empresa (No implementado en Turso)"""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Eliminación de empresas no implementada en la versión Turso"
+    )
 
-@router.get("/{empresa_id}/representantes", response_model=List[Dict[str, Any]])
+@router.get("/{empresa_id}/representantes", response_model=Dict[str, Any])
 async def obtener_representantes_empresa(
-    empresa_id: int,
-    db: AsyncSession = Depends(get_db_session)
+    empresa_id: int
 ):
-    """Obtener solo los representantes de una empresa"""
+    """Obtener solo los representantes de una empresa usando Turso"""
     try:
-        empresa = await EmpresaService.obtener_empresa_por_id(db, empresa_id)
+        # Buscar empresa por ID
+        empresas = empresa_service.list_empresas(limit=1000)
+        empresa = next((e for e in empresas if e.get('id') == empresa_id), None)
         
         if not empresa:
             raise HTTPException(
@@ -234,17 +293,27 @@ async def obtener_representantes_empresa(
                 detail="Empresa no encontrada"
             )
         
+        # Por ahora, usar los datos del representante legal como único representante
+        representantes = []
+        if empresa.get('representante_legal') and empresa.get('dni_representante'):
+            representantes.append({
+                "id": 1,
+                "nombre": empresa.get('representante_legal'),
+                "cargo": "Representante Legal",
+                "numero_documento": empresa.get('dni_representante'),
+                "tipo_documento": "DNI",
+                "es_principal": True,
+                "estado": "ACTIVO"
+            })
+        
         return {
             "success": True,
             "data": {
-                "empresa_id": empresa.id,
-                "razon_social": empresa.razon_social,
-                "representantes": empresa.representantes,
-                "total_representantes": len(empresa.representantes),
-                "representante_principal": next(
-                    (repr for repr in empresa.representantes if repr.es_principal),
-                    None
-                )
+                "empresa_id": empresa.get('id'),
+                "razon_social": empresa.get('razon_social'),
+                "representantes": representantes,
+                "total_representantes": len(representantes),
+                "representante_principal": representantes[0] if representantes else None
             }
         }
         
@@ -257,11 +326,10 @@ async def obtener_representantes_empresa(
         )
 
 @router.post("/validar-ruc")
-async def validar_ruc(
-    ruc_data: Dict[str, str],
-    db: AsyncSession = Depends(get_db_session)
+async def validar_ruc_endpoint(
+    ruc_data: Dict[str, str]
 ):
-    """Validar si un RUC ya está registrado"""
+    """Validar si un RUC ya está registrado usando Turso"""
     try:
         ruc = ruc_data.get("ruc")
         if not ruc:
@@ -270,14 +338,14 @@ async def validar_ruc(
                 detail="RUC es requerido"
             )
         
-        if not EmpresaService.validar_ruc(ruc):
+        if not validar_ruc(ruc):
             return {
                 "success": False,
                 "valid": False,
                 "message": "RUC inválido. Debe tener 11 dígitos y comenzar con 10 o 20"
             }
         
-        empresa_existente = await EmpresaService.obtener_empresa_por_ruc(db, ruc)
+        empresa_existente = empresa_service.get_empresa_by_ruc(ruc)
         
         return {
             "success": True,
@@ -288,7 +356,7 @@ async def validar_ruc(
                 "RUC ya registrado en el sistema" if empresa_existente 
                 else "RUC disponible para registro"
             ),
-            "empresa": empresa_existente.dict() if empresa_existente else None
+            "empresa": convertir_empresa_dict_a_response(empresa_existente).dict() if empresa_existente else None
         }
         
     except HTTPException:
@@ -301,50 +369,50 @@ async def validar_ruc(
 
 # Endpoint para estadísticas
 @router.get("/stats/summary")
-async def obtener_estadisticas_empresas(
-    db: AsyncSession = Depends(get_db_session)
-):
-    """Obtener estadísticas generales de empresas"""
+async def obtener_estadisticas_empresas():
+    """Obtener estadísticas generales de empresas usando Turso"""
     try:
-        # Obtener todas las empresas para estadísticas básicas
-        resultado = await EmpresaService.listar_empresas(
-            session=db, 
-            page=1, 
-            per_page=10000  # Obtener todas para estadísticas
-        )
+        # Obtener estadísticas directamente del servicio
+        stats = empresa_service.get_stats()
         
-        empresas = resultado["empresas"]
-        total = resultado["total"]
+        if "error" in stats:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error obteniendo estadísticas: {stats['error']}"
+            )
         
-        # Calcular estadísticas
-        activas = len([e for e in empresas if e.estado == "ACTIVO"])
-        inactivas = len([e for e in empresas if e.estado == "INACTIVO"])
+        # Obtener algunas empresas para análisis adicional
+        empresas = empresa_service.list_empresas(limit=1000)
         
         # Estadísticas por tipo
         tipos = {}
         for empresa in empresas:
-            tipo = empresa.tipo_empresa
+            tipo = empresa.get('tipo_empresa', 'UNKNOWN')
             tipos[tipo] = tipos.get(tipo, 0) + 1
         
         # Estadísticas por categoría
         categorias = {}
         for empresa in empresas:
-            if empresa.categoria_contratista:
-                cat = empresa.categoria_contratista
+            cat = empresa.get('categoria_contratista')
+            if cat:
                 categorias[cat] = categorias.get(cat, 0) + 1
         
         return {
             "success": True,
             "data": {
-                "total_empresas": total,
-                "activas": activas,
-                "inactivas": inactivas,
+                "total_empresas": stats.get('total_empresas', 0),
+                "activas": stats.get('empresas_por_estado', {}).get('ACTIVO', 0),
+                "inactivas": stats.get('empresas_por_estado', {}).get('INACTIVO', 0),
+                "empresas_recientes_24h": stats.get('empresas_recientes_24h', 0),
                 "por_tipo": tipos,
                 "por_categoria": categorias,
-                "ultima_actualizacion": datetime.now().isoformat()
+                "por_estado": stats.get('empresas_por_estado', {}),
+                "ultima_actualizacion": stats.get('timestamp', datetime.now().isoformat())
             }
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -15,13 +15,14 @@ load_dotenv()
 # Turso configuration - load at runtime to avoid import errors
 def get_turso_config():
     """Get Turso configuration from environment"""
-    TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
+    TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "libsql://registro-de-valorizaciones-eneasjo.aws-us-east-2.turso.io")
     TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
     
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
         print(f"⚠️ Turso config missing: URL={bool(TURSO_DATABASE_URL)}, TOKEN={bool(TURSO_AUTH_TOKEN)}")
         return None, None
     
+    print(f"✅ Turso config loaded: URL configured, TOKEN={'configured' if TURSO_AUTH_TOKEN else 'missing'}")
     return TURSO_DATABASE_URL, TURSO_AUTH_TOKEN
 
 # Turso async client

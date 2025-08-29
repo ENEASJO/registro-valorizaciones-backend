@@ -35,7 +35,7 @@ except ImportError as e:
     print(f"⚠️ Playwright helper not available: {e}")
     PLAYWRIGHT_HELPER_AVAILABLE = False
 
-# from app.api.routes import empresas  # Temporarily disabled until dependencies are installed
+from app.api.routes import empresas  # Re-enabled for Turso integration
 
 # Try to import MCP database, but make it optional
 try:
@@ -138,7 +138,7 @@ if ROUTES_AVAILABLE:
     app.include_router(obras.router)
     app.include_router(valorizaciones.router)
     app.include_router(notifications.router)
-    # app.include_router(empresas.router)  # Temporarily disabled
+    app.include_router(empresas.router)  # Re-enabled for Turso integration
     print("✅ All API routers included")
 else:
     print("⚠️ Running with minimal routes due to import errors")
@@ -478,8 +478,13 @@ async def consultar_ruc(ruc: str):
         }
 
 @app.get("/consulta-ruc-consolidada/{ruc}")
-async def consultar_ruc_consolidado(ruc: str):
-    """Endpoint consolidado que combina datos de SUNAT y OSCE para el frontend"""
+async def consultar_ruc_consolidado(ruc: str, save_to_db: bool = True):
+    """Endpoint consolidado que combina datos de SUNAT y OSCE para el frontend
+    
+    Args:
+        ruc: RUC a consultar  
+        save_to_db: Si True, guarda automáticamente los datos en Turso (default: True)
+    """
     
     try:
         print(f"🔍 Iniciando consulta consolidada para RUC: {ruc}")
@@ -832,13 +837,51 @@ async def consultar_ruc_consolidado(ruc: str):
                 "observaciones": []
             }
         
-        return {
+        # Guardar empresa en base de datos si está habilitado
+        empresa_id = None
+        if save_to_db:
+            try:
+                from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+                empresa_service = EmpresaServiceTurso()
+                
+                # Construir datos para guardar
+                respuesta_completa = {
+                    "success": True,
+                    "data": datos_consolidados,
+                    "timestamp": datetime.now().isoformat(),
+                    "fuente": "CONSOLIDADO",
+                    "version": "3.2.0"
+                }
+                
+                empresa_id = empresa_service.save_empresa_from_consulta(ruc, respuesta_completa)
+                if empresa_id:
+                    print(f"✅ Empresa {ruc} guardada en base de datos con ID: {empresa_id}")
+                else:
+                    print(f"⚠️ No se pudo guardar empresa {ruc} en base de datos")
+                    
+                empresa_service.close()
+                
+            except Exception as db_error:
+                print(f"⚠️ Error guardando en base de datos: {db_error}")
+                empresa_id = None
+
+        # Agregar información de guardado a la respuesta
+        response_data = {
             "success": True,
             "data": datos_consolidados,
             "timestamp": datetime.now().isoformat(),
             "fuente": "CONSOLIDADO",
             "version": "3.2.0"
         }
+        
+        if save_to_db:
+            response_data["database"] = {
+                "saved": empresa_id is not None,
+                "empresa_id": empresa_id,
+                "message": "Empresa guardada exitosamente" if empresa_id else "No se pudo guardar en base de datos"
+            }
+        
+        return response_data
         
     except Exception as e:
         print(f"❌ Error en consulta consolidada: {e}")
@@ -2175,5 +2218,272 @@ async def crear_empresa_temporal(empresa_data: EmpresaCreateTemp):
             "success": False,
             "error": True,
             "message": f"Error al crear empresa: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
+# ==========================================
+# NUEVOS ENDPOINTS PARA GESTIÓN DE EMPRESAS EN TURSO
+# ==========================================
+
+@app.get("/empresas")
+async def listar_empresas(limit: int = 50, offset: int = 0):
+    """Listar empresas guardadas en Turso"""
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        empresa_service = EmpresaServiceTurso()
+        
+        empresas = empresa_service.list_empresas(limit=limit, offset=offset)
+        empresa_service.close()
+        
+        return {
+            "success": True,
+            "data": empresas,
+            "count": len(empresas),
+            "limit": limit,
+            "offset": offset,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/empresas/search")
+async def buscar_empresas(q: str, limit: int = 20):
+    """Buscar empresas por RUC o razón social"""
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        empresa_service = EmpresaServiceTurso()
+        
+        empresas = empresa_service.search_empresas(q, limit=limit)
+        empresa_service.close()
+        
+        return {
+            "success": True,
+            "data": empresas,
+            "query": q,
+            "count": len(empresas),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "query": q,
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/empresas/{ruc}")
+async def obtener_empresa_por_ruc(ruc: str):
+    """Obtener empresa específica por RUC desde la base de datos"""
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        empresa_service = EmpresaServiceTurso()
+        
+        empresa = empresa_service.get_empresa_by_ruc(ruc)
+        empresa_service.close()
+        
+        if empresa:
+            return {
+                "success": True,
+                "data": empresa,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Empresa con RUC {ruc} no encontrada",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "ruc": ruc,
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/empresas/stats")
+async def estadisticas_empresas():
+    """Obtener estadísticas de la base de datos de empresas"""
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        empresa_service = EmpresaServiceTurso()
+        
+        stats = empresa_service.get_stats()
+        empresa_service.close()
+        
+        return {
+            "success": True,
+            "data": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+# ===== ENDPOINTS COMPLEMENTARIOS PARA EMPRESAS GUARDADAS =====
+
+@app.get("/api/empresas-guardadas")
+async def listar_empresas_guardadas(limit: int = 50, offset: int = 0):
+    """Listar empresas guardadas con paginación"""
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        empresa_service = EmpresaServiceTurso()
+        
+        empresas = empresa_service.list_empresas(limit=limit, offset=offset)
+        empresa_service.close()
+        
+        return {
+            "success": True,
+            "data": empresas,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "total": len(empresas)
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/empresas-guardadas/search")
+async def buscar_empresas_guardadas(q: str, limit: int = 20):
+    """Buscar empresas por RUC o razón social"""
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        empresa_service = EmpresaServiceTurso()
+        
+        empresas = empresa_service.search_empresas(q, limit=limit)
+        empresa_service.close()
+        
+        return {
+            "success": True,
+            "data": empresas,
+            "query": q,
+            "total_found": len(empresas),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "query": q,
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/empresas-guardadas/{ruc}")
+async def obtener_empresa_guardada(ruc: str):
+    """Obtener empresa específica por RUC"""
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        empresa_service = EmpresaServiceTurso()
+        
+        empresa = empresa_service.get_empresa_by_ruc(ruc)
+        empresa_service.close()
+        
+        if empresa:
+            return {
+                "success": True,
+                "data": empresa,
+                "ruc": ruc,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "error": "Empresa no encontrada",
+                "ruc": ruc,
+                "timestamp": datetime.now().isoformat()
+            }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "ruc": ruc,
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/empresas-guardadas/stats")
+async def estadisticas_empresas_guardadas():
+    """Estadísticas rápidas de empresas guardadas"""
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        empresa_service = EmpresaServiceTurso()
+        
+        stats = empresa_service.get_stats()
+        empresa_service.close()
+        
+        return {
+            "success": True,
+            "data": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.delete("/api/empresas-guardadas/{ruc}")
+async def eliminar_empresa_guardada(ruc: str):
+    """Eliminar empresa por RUC"""
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        empresa_service = EmpresaServiceTurso()
+        
+        # Verificar si existe antes de eliminar
+        empresa_existente = empresa_service.get_empresa_by_ruc(ruc)
+        if not empresa_existente:
+            empresa_service.close()
+            return {
+                "success": False,
+                "error": "Empresa no encontrada",
+                "ruc": ruc,
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # Proceder con la eliminación
+        eliminado = empresa_service.delete_empresa(ruc)
+        empresa_service.close()
+        
+        if eliminado:
+            return {
+                "success": True,
+                "message": "Empresa eliminada correctamente",
+                "ruc": ruc,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "error": "No se pudo eliminar la empresa",
+                "ruc": ruc,
+                "timestamp": datetime.now().isoformat()
+            }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "ruc": ruc,
             "timestamp": datetime.now().isoformat()
         }
