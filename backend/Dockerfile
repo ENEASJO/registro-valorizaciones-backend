@@ -49,4 +49,4 @@ EXPOSE 8080
 #   CMD python -c "import requests; requests.get('http://localhost:8080/health', timeout=5)" || exit 1
 
 # Comando de inicio optimizado para Cloud Run
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1"]
