@@ -11,7 +11,7 @@ from typing import Dict, Any
 app = FastAPI(
     title="API de Valorizaciones - Inicio Rápido", 
     description="Backend con Playwright lazy loading para inicio rápido",
-    version="3.4.0"
+    version="3.5.0"
 )
 
 # CORS básico
@@ -114,17 +114,46 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
             
             # Llenar el formulario
             await page.fill("#txtRuc", ruc)
-            await page.fill("#txtCaptcha", "")  # Captcha vacío para probar
+            
+            # Esperar un momento para cargar dinámico
+            await page.wait_for_timeout(1000)
+            
+            # Verificar si el campo captcha es visible (cambió de #txtCaptcha a #txtCodigo)
+            captcha_visible = False
+            try:
+                captcha_visible = await page.is_visible("#txtCodigo", timeout=2000)
+                print(f"🔐 Campo captcha visible: {captcha_visible}")
+            except:
+                print("⚠️ No se pudo verificar visibilidad del captcha")
+            
+            # Llenar captcha solo si está visible
+            if captcha_visible:
+                await page.fill("#txtCodigo", "")  # Captcha vacío (necesitarías resolver captcha real)
+                print("🔐 Campo captcha llenado")
             
             # Submit
             await page.click("#btnAceptar")
-            await page.wait_for_timeout(3000)
+            await page.wait_for_timeout(5000)  # Más tiempo para cargar resultados
             
             # Extraer datos básicos
             try:
-                # Intentar obtener la razón social
-                razon_social_element = await page.query_selector(".normal")
-                razon_social = await razon_social_element.inner_text() if razon_social_element else "No disponible"
+                # Múltiples selectores para obtener la razón social
+                razon_social = "No disponible"
+                possible_selectors = [".normal", "td.normal", ".descripcion", "strong", "b"]
+                
+                for selector in possible_selectors:
+                    try:
+                        elements = await page.query_selector_all(selector)
+                        for element in elements:
+                            text = await element.inner_text()
+                            if text and len(text.strip()) > 10:  # Filtrar texto con contenido
+                                razon_social = text.strip()
+                                print(f"✅ Razón social encontrada con selector {selector}: {razon_social}")
+                                break
+                        if razon_social != "No disponible":
+                            break
+                    except:
+                        continue
                 
                 resultado = {
                     "success": True,
