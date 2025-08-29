@@ -1,6 +1,7 @@
 # Ignorar todo excepto archivos esenciales
 *
 !Dockerfile
+!requirements.txt
 !requirements-cloudrun.txt
 !main.py
 !app/
