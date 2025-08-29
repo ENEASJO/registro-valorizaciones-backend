@@ -11,7 +11,7 @@ from typing import Dict, Any
 app = FastAPI(
     title="API de Valorizaciones - Inicio Rápido", 
     description="Backend con Playwright lazy loading para inicio rápido",
-    version="3.3.0"
+    version="3.4.0"
 )
 
 # CORS básico
@@ -169,6 +169,15 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
             "message": f"Error consultando SUNAT: {str(e)}",
             "timestamp": datetime.now().isoformat()
         }
+
+# Endpoint GET para compatibilidad con frontend (redirige a POST)
+@app.get("/consulta-ruc-consolidada/{ruc}")
+async def consultar_ruc_get(ruc: str):
+    """Endpoint GET para compatibilidad - redirige al endpoint POST"""
+    # Crear el objeto RUCInput internamente
+    ruc_input = RUCInput(ruc=ruc)
+    # Llamar al endpoint POST existente
+    return await consultar_ruc_sunat(ruc_input)
 
 # Test de Playwright (lazy loading)
 @app.get("/debug/playwright-test")
