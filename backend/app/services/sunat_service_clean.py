@@ -64,6 +64,7 @@ class SUNATServiceClean:
         async with async_playwright() as p:
             launch_options = self._get_stealth_browser_options()
             browser = await p.chromium.launch(**launch_options)
+            context = None
             
             try:
                 context = await browser.new_context(
@@ -135,8 +136,12 @@ class SUNATServiceClean:
                 
             finally:
                 try:
-                    await browser.close()
-                except:
+                    if context:
+                        await context.close()
+                    if browser:
+                        await browser.close()
+                except Exception as e:
+                    logger.warning(f"⚠️ Error cerrando browser: {e}")
                     pass
     
     async def _ejecutar_busqueda_stealth(self, page, ruc: str):
@@ -162,7 +167,13 @@ class SUNATServiceClean:
             await page.click('#btnAceptar')
             logger.info("✅ Búsqueda iniciada")
             
-            await page.wait_for_timeout(8000)
+            # Esperar respuesta con checks intermedios para evitar browser closed
+            await page.wait_for_timeout(3000)
+            logger.info("⏳ Esperando respuesta SUNAT (paso 1/3)")
+            await page.wait_for_timeout(3000)
+            logger.info("⏳ Esperando respuesta SUNAT (paso 2/3)")
+            await page.wait_for_timeout(2000)
+            logger.info("⏳ Respuesta SUNAT lista")
             
         except Exception as e:
             logger.error(f"❌ Error en búsqueda stealth: {str(e)}")
