@@ -1,3 +1,8 @@
+# Solo ejecutar este build cuando cambien archivos en backend/
+# Configurar en Google Cloud Console: 
+# Included files filter: backend/**
+# Ignored files filter: frontend/**, README.md, *.md
+
 steps:
   # Build the container image from backend directory
   - name: 'gcr.io/cloud-builders/docker'
