@@ -11,7 +11,7 @@ from typing import Dict, Any
 app = FastAPI(
     title="API de Valorizaciones - Inicio Rápido", 
     description="Backend con Playwright lazy loading para inicio rápido",
-    version="4.1.1"
+    version="4.1.2"
 )
 
 # CORS básico
@@ -236,8 +236,8 @@ async def consultar_ruc_consolidado(ruc: str):
                 "estado": resultado_consolidado.registro.estado_sunat if resultado_consolidado.registro else "No disponible",
                 "direccion": resultado_consolidado.contacto.direccion if resultado_consolidado.contacto else "",
                 "departamento": resultado_consolidado.contacto.departamento if resultado_consolidado.contacto else "",
-                "provincia": resultado_consolidado.contacto.provincia if resultado_consolidado.contacto else "",
-                "distrito": resultado_consolidado.contacto.distrito if resultado_consolidado.contacto else "",
+                "provincia": resultado_consolidado.contacto.ciudad if resultado_consolidado.contacto else "",
+                "distrito": "",
                 "fuentes": resultado_consolidado.fuentes_consultadas,
                 "representantes": [
                     {
@@ -249,11 +249,11 @@ async def consultar_ruc_consolidado(ruc: str):
                 ] if resultado_consolidado.miembros else [],
                 "contactos": [
                     {
-                        "telefono": resultado_consolidado.contacto.telefonos[0] if resultado_consolidado.contacto.telefonos else "",
-                        "email": resultado_consolidado.contacto.emails[0] if resultado_consolidado.contacto.emails else "",
+                        "telefono": resultado_consolidado.contacto.telefono if resultado_consolidado.contacto else "",
+                        "email": resultado_consolidado.contacto.email if resultado_consolidado.contacto else "",
                         "fuente": "CONSOLIDADO"
                     }
-                ] if resultado_consolidado.contacto and (resultado_consolidado.contacto.telefonos or resultado_consolidado.contacto.emails) else [],
+                ] if resultado_consolidado.contacto and (resultado_consolidado.contacto.telefono or resultado_consolidado.contacto.email) else [],
                 "consolidacion_exitosa": True,
                 "fuente": "CONSOLIDADO_SUNAT_OSCE"
             },
