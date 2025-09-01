@@ -11,7 +11,7 @@ from typing import Dict, Any
 app = FastAPI(
     title="API de Valorizaciones - Inicio Rápido", 
     description="Backend con Playwright lazy loading para inicio rápido",
-    version="4.1.3"
+    version="4.2.0"
 )
 
 # CORS básico
@@ -87,22 +87,40 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
         playwright_helper = get_playwright_helper()
         
         async with async_playwright() as p:
-            # Configuración del navegador
-            if playwright_helper and playwright_helper != False:
-                launch_options = playwright_helper(headless=True)
-                browser = await p.chromium.launch(**launch_options)
-            else:
-                # Configuración básica para Cloud Run
+            # Configuración del navegador optimizada
+            print("🔧 Configurando navegador...")
+            
+            # Detectar si estamos en desarrollo local
+            is_local = not any(os.environ.get(var) for var in ['K_SERVICE', 'GOOGLE_CLOUD_PROJECT'])
+            
+            if is_local:
+                # Configuración simple para desarrollo local
                 browser = await p.chromium.launch(
                     headless=True,
                     args=[
-                        '--no-sandbox', 
-                        '--disable-dev-shm-usage', 
-                        '--disable-blink-features=AutomationControlled',
-                        '--disable-web-security',
-                        '--disable-features=VizDisplayCompositor'
+                        '--no-sandbox',
+                        '--disable-dev-shm-usage'
                     ]
                 )
+                print("🏠 Usando configuración para desarrollo local")
+            else:
+                # Usar configuración optimizada para producción
+                if playwright_helper and playwright_helper != False:
+                    launch_options = playwright_helper(headless=True)
+                    browser = await p.chromium.launch(**launch_options)
+                    print("☁️ Usando configuración para Cloud Run")
+                else:
+                    browser = await p.chromium.launch(
+                        headless=True,
+                        args=[
+                            '--no-sandbox', 
+                            '--disable-dev-shm-usage', 
+                            '--disable-blink-features=AutomationControlled',
+                            '--disable-web-security',
+                            '--disable-features=VizDisplayCompositor'
+                        ]
+                    )
+                    print("☁️ Usando configuración básica para producción")
             
             page = await browser.new_page(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36"
@@ -118,63 +136,210 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
             # Esperar un momento para cargar dinámico
             await page.wait_for_timeout(1000)
             
-            # Verificar si el campo captcha es visible (cambió de #txtCaptcha a #txtCodigo)
+            # Verificar si el campo captcha es visible (múltiples posibles IDs)
             captcha_visible = False
-            try:
-                captcha_visible = await page.is_visible("#txtCodigo", timeout=2000)
-                print(f"🔐 Campo captcha visible: {captcha_visible}")
-            except:
-                print("⚠️ No se pudo verificar visibilidad del captcha")
+            captcha_selector = None
+            possible_captcha_selectors = ["#txtCodigo", "#txtCaptcha", "input[name*='captcha']", "input[name*='codigo']"]
             
-            # Llenar captcha solo si está visible
+            for selector in possible_captcha_selectors:
+                try:
+                    if await page.is_visible(selector, timeout=1000):
+                        captcha_visible = True
+                        captcha_selector = selector
+                        print(f"🔐 Campo captcha encontrado: {selector}")
+                        break
+                except:
+                    continue
+            
+            if not captcha_visible:
+                print("✅ No se requiere CAPTCHA")
+            
+            # Si hay captcha visible, esto indica que SUNAT está requiriendo verificación
             if captcha_visible:
-                await page.fill("#txtCodigo", "")  # Captcha vacío (necesitarías resolver captcha real)
-                print("🔐 Campo captcha llenado")
+                print("⚠️ SUNAT requiere CAPTCHA - no se puede automatizar completamente")
+                # En producción, aquí se podría integrar con un servicio de resolución de CAPTCHA
+                # Por ahora, continuamos sin llenar el captcha para ver el comportamiento
+                print("🔄 Continuando sin resolver CAPTCHA...")
             
             # Submit
             await page.click("#btnAceptar")
             await page.wait_for_timeout(5000)  # Más tiempo para cargar resultados
             
-            # Extraer datos básicos
+            # Extraer datos básicos con debugging mejorado
             try:
-                # Múltiples selectores para obtener la razón social
-                razon_social = "No disponible"
-                possible_selectors = [".normal", "td.normal", ".descripcion", "strong", "b"]
+                print("🔍 Iniciando extracción de datos de SUNAT...")
                 
-                for selector in possible_selectors:
-                    try:
-                        elements = await page.query_selector_all(selector)
-                        for element in elements:
-                            text = await element.inner_text()
-                            if text and len(text.strip()) > 10:  # Filtrar texto con contenido
-                                razon_social = text.strip()
-                                print(f"✅ Razón social encontrada con selector {selector}: {razon_social}")
-                                break
-                        if razon_social != "No disponible":
+                # Debug: Verificar si estamos en la página de resultados
+                page_url = page.url
+                page_title = await page.title()
+                print(f"📄 URL actual: {page_url}")
+                print(f"📄 Título de página: {page_title}")
+                
+                # Debug: Verificar si hay contenido de resultados
+                resultado_section = await page.query_selector('text="Resultado de la Búsqueda"')
+                if not resultado_section:
+                    print("⚠️ No se encontró sección 'Resultado de la Búsqueda'")
+                    # Verificar si hay error o página no cargada
+                    page_content = await page.content()
+                    if "captcha" in page_content.lower() or "código" in page_content.lower():
+                        print("🔐 Posible CAPTCHA detectado en la página")
+                    raise Exception("Página de resultados no encontrada - posible CAPTCHA o error")
+                else:
+                    print("✅ Sección de resultados encontrada")
+                
+                # Estrategia 1: Buscar h4 que contenga RUC - NOMBRE (el más confiable)
+                razon_social = "No disponible"
+                estado = "No disponible"
+                direccion = "No disponible"
+                
+                # Obtener todas las h4 para análisis
+                h4_elements = await page.query_selector_all('h4')
+                print(f"📊 Encontrados {len(h4_elements)} elementos h4")
+                
+                for i, h4 in enumerate(h4_elements):
+                    text = await h4.inner_text()
+                    text = text.strip()
+                    print(f"🔍 H4[{i}]: {text}")
+                    
+                    # Buscar el patrón RUC - NOMBRE EMPRESA
+                    if " - " in text and text.startswith(ruc):
+                        # Extraer nombre de empresa después del RUC
+                        parts = text.split(" - ", 1)
+                        if len(parts) >= 2:
+                            razon_social = parts[1].strip()
+                            print(f"✅ Razón social encontrada: {razon_social}")
                             break
-                    except:
-                        continue
+                
+                # Estrategia 2: Si no encontramos con h4, buscar en otros elementos
+                if razon_social == "No disponible":
+                    print("🔄 Intentando estrategia alternativa...")
+                    
+                    # Buscar texto que contenga el RUC seguido de guión
+                    ruc_pattern_elements = await page.query_selector_all(f'text=/{ruc}\\s*-\\s*/')
+                    for element in ruc_pattern_elements:
+                        text = await element.inner_text()
+                        if " - " in text:
+                            parts = text.split(" - ", 1)
+                            if len(parts) >= 2 and parts[1].strip():
+                                razon_social = parts[1].strip()
+                                print(f"✅ Razón social encontrada (método alternativo): {razon_social}")
+                                break
+                
+                # Extraer estado del contribuyente
+                try:
+                    # Buscar h4 que contenga "Estado del Contribuyente:"
+                    for h4 in h4_elements:
+                        h4_text = await h4.inner_text()
+                        if "Estado del Contribuyente:" in h4_text:
+                            # Buscar el siguiente párrafo en el padre
+                            parent_el = await h4.evaluate('el => el.parentElement')
+                            paragraphs = await page.query_selector_all('p')
+                            
+                            # Encontrar el párrafo después del h4 de estado
+                            for p in paragraphs:
+                                p_text = await p.inner_text()
+                                p_text = p_text.strip()
+                                if p_text and p_text not in ["ACTIVO", "INACTIVO", "SUSPENDIDO", "HABIDO", "NO HABIDO"] and len(p_text) < 50:
+                                    if "ACTIVO" in p_text or "INACTIVO" in p_text or "SUSPENDIDO" in p_text:
+                                        estado = p_text
+                                        print(f"✅ Estado encontrado: {estado}")
+                                        break
+                            break
+                except Exception as e:
+                    print(f"⚠️ Error extrayendo estado: {e}")
+                
+                # Extraer dirección
+                try:
+                    # Buscar h4 que contenga "Domicilio Fiscal:"
+                    for h4 in h4_elements:
+                        h4_text = await h4.inner_text()
+                        if "Domicilio Fiscal:" in h4_text:
+                            # Buscar párrafos que contengan dirección
+                            paragraphs = await page.query_selector_all('p')
+                            
+                            for p in paragraphs:
+                                p_text = await p.inner_text()
+                                p_text = p_text.strip()
+                                # Identificar párrafos que parecen direcciones
+                                if p_text and any(word in p_text.upper() for word in ["JR.", "AV.", "CALLE", "LIMA", "NRO.", "MZA", "LOTE"]) and len(p_text) > 20:
+                                    direccion = p_text
+                                    print(f"✅ Dirección encontrada: {direccion}")
+                                    break
+                            break
+                except Exception as e:
+                    print(f"⚠️ Error extrayendo dirección: {e}")
+                
+                # Debug final: mostrar lo que se extrajo
+                print(f"📋 Datos extraídos:")
+                print(f"   RUC: {ruc}")
+                print(f"   Razón Social: {razon_social}")
+                print(f"   Estado: {estado}")
+                print(f"   Dirección: {direccion}")
+                
+                # Si aún no tenemos datos, hacer un último intento con texto completo
+                if razon_social == "No disponible":
+                    print("🔄 Último intento: analizando todo el contenido de la página...")
+                    page_text = await page.evaluate('() => document.body.innerText')
+                    
+                    # Buscar líneas que contengan el RUC
+                    lines = page_text.split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        if ruc in line and " - " in line and len(line) < 200:  # Evitar líneas muy largas
+                            print(f"🔍 Línea candidata: {line}")
+                            if line.startswith(ruc):
+                                parts = line.split(" - ", 1)
+                                if len(parts) >= 2:
+                                    candidate = parts[1].strip()
+                                    # Validar que parece un nombre de empresa
+                                    if len(candidate) > 5 and not candidate.isdigit():
+                                        razon_social = candidate
+                                        print(f"✅ Razón social encontrada (análisis completo): {razon_social}")
+                                        break
                 
                 resultado = {
                     "success": True,
                     "data": {
                         "ruc": ruc,
                         "razon_social": razon_social,
-                        "estado": "Encontrado",
-                        "fuente": "SUNAT_PLAYWRIGHT"
+                        "estado": estado if estado != "No disponible" else "Encontrado",
+                        "direccion": direccion,
+                        "fuente": "SUNAT_PLAYWRIGHT",
+                        "extraccion_exitosa": razon_social != "No disponible"
                     },
                     "timestamp": datetime.now().isoformat()
                 }
             except Exception as extract_error:
                 print(f"⚠️ Error extrayendo datos: {extract_error}")
-                # Datos de fallback
+                
+                # Verificar si el error es por CAPTCHA
+                error_message = str(extract_error).lower()
+                if "captcha" in error_message or "página de resultados no encontrada" in error_message:
+                    return {
+                        "success": False,
+                        "error": True,
+                        "message": "SUNAT requiere CAPTCHA - consulta manual necesaria",
+                        "error_type": "CAPTCHA_REQUIRED",
+                        "data": {
+                            "ruc": ruc,
+                            "razon_social": "No disponible - CAPTCHA requerido",
+                            "estado": "CAPTCHA requerido",
+                            "fuente": "SUNAT_BLOCKED"
+                        },
+                        "timestamp": datetime.now().isoformat()
+                    }
+                
+                # Error general - datos de fallback
                 resultado = {
                     "success": True,
                     "data": {
                         "ruc": ruc,
                         "razon_social": f"EMPRESA RUC {ruc}",
                         "estado": "Datos limitados",
-                        "fuente": "FALLBACK"
+                        "direccion": "No disponible",
+                        "fuente": "FALLBACK",
+                        "extraccion_exitosa": False,
+                        "error_extraccion": str(extract_error)
                     },
                     "timestamp": datetime.now().isoformat()
                 }
