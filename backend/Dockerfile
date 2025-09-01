@@ -1,9 +1,8 @@
 # Dockerfile simplificado para debug - sin Playwright hasta que funcione básico
 FROM python:3.11-slim
 
-# Variables de entorno básicas
+# Variables de entorno básicas para Cloud Run
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8080
 
 # Directorio de trabajo
 WORKDIR /app
@@ -26,5 +25,5 @@ USER app
 # Exponer puerto
 EXPOSE 8080
 
-# Comando con más logging para debug
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--log-level", "info"]
+# Comando que usa la variable PORT de Cloud Run
+CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --log-level info
