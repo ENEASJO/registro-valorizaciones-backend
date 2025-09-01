@@ -11,7 +11,7 @@ from typing import Dict, Any
 app = FastAPI(
     title="API de Valorizaciones - Inicio Rápido", 
     description="Backend con Playwright lazy loading para inicio rápido",
-    version="4.1.0"
+    version="4.1.1"
 )
 
 # CORS básico
@@ -233,27 +233,27 @@ async def consultar_ruc_consolidado(ruc: str):
             "data": {
                 "ruc": resultado_consolidado.ruc,
                 "razon_social": resultado_consolidado.razon_social,
-                "estado": resultado_consolidado.estado,
-                "direccion": resultado_consolidado.direccion,
-                "departamento": resultado_consolidado.departamento,
-                "provincia": resultado_consolidado.provincia,
-                "distrito": resultado_consolidado.distrito,
-                "fuentes": resultado_consolidado.fuentes,
+                "estado": resultado_consolidado.registro.estado_sunat if resultado_consolidado.registro else "No disponible",
+                "direccion": resultado_consolidado.contacto.direccion if resultado_consolidado.contacto else "",
+                "departamento": resultado_consolidado.contacto.departamento if resultado_consolidado.contacto else "",
+                "provincia": resultado_consolidado.contacto.provincia if resultado_consolidado.contacto else "",
+                "distrito": resultado_consolidado.contacto.distrito if resultado_consolidado.contacto else "",
+                "fuentes": resultado_consolidado.fuentes_consultadas,
                 "representantes": [
                     {
-                        "nombre": repr.nombre,
-                        "cargo": repr.cargo,
-                        "documento": repr.documento,
-                        "fuente": repr.fuente
-                    } for repr in resultado_consolidado.representantes
-                ] if resultado_consolidado.representantes else [],
+                        "nombre": miembro.nombre,
+                        "cargo": miembro.cargo,
+                        "documento": miembro.documento,
+                        "fuente": miembro.fuente_origen
+                    } for miembro in resultado_consolidado.miembros
+                ] if resultado_consolidado.miembros else [],
                 "contactos": [
                     {
-                        "telefono": cont.telefono,
-                        "email": cont.email,
-                        "fuente": cont.fuente
-                    } for cont in resultado_consolidado.contactos
-                ] if resultado_consolidado.contactos else [],
+                        "telefono": resultado_consolidado.contacto.telefonos[0] if resultado_consolidado.contacto.telefonos else "",
+                        "email": resultado_consolidado.contacto.emails[0] if resultado_consolidado.contacto.emails else "",
+                        "fuente": "CONSOLIDADO"
+                    }
+                ] if resultado_consolidado.contacto and (resultado_consolidado.contacto.telefonos or resultado_consolidado.contacto.emails) else [],
                 "consolidacion_exitosa": True,
                 "fuente": "CONSOLIDADO_SUNAT_OSCE"
             },
