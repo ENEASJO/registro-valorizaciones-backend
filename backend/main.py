@@ -11,7 +11,7 @@ from typing import Dict, Any
 app = FastAPI(
     title="API de Valorizaciones - Inicio Rápido", 
     description="Backend con Playwright lazy loading para inicio rápido",
-    version="4.1.2"
+    version="4.1.3"
 )
 
 # CORS básico
@@ -243,8 +243,8 @@ async def consultar_ruc_consolidado(ruc: str):
                     {
                         "nombre": miembro.nombre,
                         "cargo": miembro.cargo,
-                        "documento": miembro.documento,
-                        "fuente": miembro.fuente_origen
+                        "documento": miembro.numero_documento,
+                        "fuente": miembro.fuente
                     } for miembro in resultado_consolidado.miembros
                 ] if resultado_consolidado.miembros else [],
                 "contactos": [
