@@ -1,0 +1,17 @@
+# FastAPI y dependencias web básicas (sin Playwright)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# CORS y middleware
+python-multipart==0.0.6
+
+# Configuración y logging
+python-dotenv==1.0.0
+
+# Utilidades básicas
+typing-extensions==4.8.0
+
+# HTTP client para consultas externas
+httpx==0.25.2
