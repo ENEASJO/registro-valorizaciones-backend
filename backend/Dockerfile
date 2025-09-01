@@ -1,18 +1,35 @@
-# Dockerfile simplificado para debug - sin Playwright hasta que funcione básico
+# Dockerfile completo con Playwright para Cloud Run
 FROM python:3.11-slim
 
-# Variables de entorno básicas para Cloud Run
-ENV PYTHONUNBUFFERED=1
+# Librerías necesarias para Playwright
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ca-certificates curl wget \
+  libasound2 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+  libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxrender1 libxkbcommon0 \
+  libpango-1.0-0 libnss3 libxcb1 libx11-6 libxext6 libxi6 libxcursor1 \
+  libgbm1 libxss1 libcairo2 libcairo-gobject2 \
+  fonts-liberation libgtk-3-0 \
+  && rm -rf /var/lib/apt/lists/*
+
+# Variables de entorno para Cloud Run + Playwright
+ENV PYTHONUNBUFFERED=1 \
+    BROWSER_HEADLESS=true \
+    PLAYWRIGHT_BROWSERS_PATH=/app/.cache/ms-playwright
 
 # Directorio de trabajo
 WORKDIR /app
 
-# Crear usuario no-root
-RUN useradd --create-home --shell /bin/bash app
+# Crear usuario no-root y directorio para Playwright
+RUN useradd --create-home --shell /bin/bash app && \
+    mkdir -p /app/.cache/ms-playwright && \
+    chown -R app:app /app
 
-# Copiar e instalar dependencias básicas (sin Playwright por ahora)
-COPY requirements-basic.txt .
-RUN pip install --no-cache-dir -r requirements-basic.txt
+# Copiar e instalar dependencias completas
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Instalar browsers de Playwright
+RUN python -m playwright install chromium
 
 # Copiar aplicación
 COPY main.py .
