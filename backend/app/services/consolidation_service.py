@@ -112,31 +112,30 @@ class ConsolidationService:
         """Consultar SUNAT con manejo seguro de errores usando la función funcional de main.py"""
         try:
             # Import the working SUNAT function from main.py
-            from main import buscar_ruc_impl
+            from main import consultar_ruc_sunat, RUCInput
             
             # Call the working function directly
-            data = await buscar_ruc_impl(ruc)
+            ruc_input = RUCInput(ruc=ruc)
+            response = await consultar_ruc_sunat(ruc_input)
+            
+            # Extract data from response
+            if "success" in response and response["success"] and "data" in response:
+                data = response["data"]
+            else:
+                raise Exception(response.get("message", "Error en consulta SUNAT"))
             
             if "error" in data and data["error"]:
                 raise Exception(data.get("message", "Error en consulta SUNAT"))
             
-            # Crear lista de representantes
+            # Crear lista de representantes (main.py no devuelve representantes, solo datos básicos)
             representantes = []
-            for rep_data in data.get("representantes", []):
-                representante = RepresentanteLegal(
-                    tipo_doc=rep_data.get("tipo_doc", ""),
-                    numero_doc=rep_data.get("numero_doc", ""),
-                    nombre=rep_data.get("nombre", ""),
-                    cargo=rep_data.get("cargo", ""),
-                    fecha_desde=rep_data.get("fecha_desde", "")
-                )
-                representantes.append(representante)
+            # Note: main.py's consultar_ruc_sunat doesn't return representantes, only basic company info
             
             # Crear objeto EmpresaInfo
             empresa_info = EmpresaInfo(
                 ruc=data.get("ruc", ruc),
                 razon_social=data.get("razon_social", ""),
-                domicilio_fiscal=data.get("domicilio_fiscal", ""),
+                domicilio_fiscal=data.get("direccion", ""),  # main.py uses "direccion" field
                 representantes=representantes
             )
             

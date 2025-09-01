@@ -389,6 +389,52 @@ async def consultar_ruc_consolidado(ruc: str):
         
         print("✅ Consulta consolidada completada exitosamente")
         
+        # If SUNAT data is missing from consolidation, use fallback
+        if not resultado_consolidado.razon_social or not resultado_consolidado.fuentes_consultadas or "SUNAT" not in resultado_consolidado.fuentes_consultadas:
+            print("🔄 SUNAT data missing from consolidation, using fallback...")
+            try:
+                # Get SUNAT data directly
+                ruc_input = RUCInput(ruc=ruc)
+                resultado_sunat = await consultar_ruc_sunat(ruc_input)
+                
+                if resultado_sunat.get("success") and "data" in resultado_sunat:
+                    sunat_data = resultado_sunat["data"]
+                    # Merge SUNAT data with consolidation result
+                    return {
+                        "success": True,
+                        "data": {
+                            "ruc": ruc,
+                            "razon_social": sunat_data.get("razon_social", resultado_consolidado.razon_social),
+                            "estado": sunat_data.get("estado", resultado_consolidado.registro.estado_sunat if resultado_consolidado.registro else "ACTIVO"),
+                            "direccion": sunat_data.get("direccion", resultado_consolidado.contacto.direccion if resultado_consolidado.contacto else ""),
+                            "departamento": resultado_consolidado.contacto.departamento if resultado_consolidado.contacto else "",
+                            "provincia": resultado_consolidado.contacto.ciudad if resultado_consolidado.contacto else "",
+                            "distrito": "",
+                            "fuentes": list(set((resultado_consolidado.fuentes_consultadas or []) + ["SUNAT"])),
+                            "representantes": [
+                                {
+                                    "nombre": miembro.nombre,
+                                    "cargo": miembro.cargo,
+                                    "documento": miembro.numero_documento,
+                                    "fuente": miembro.fuente
+                                } for miembro in resultado_consolidado.miembros
+                            ] if resultado_consolidado.miembros else [],
+                            "contactos": [
+                                {
+                                    "telefono": resultado_consolidado.contacto.telefono if resultado_consolidado.contacto else "",
+                                    "email": resultado_consolidado.contacto.email if resultado_consolidado.contacto else "",
+                                    "fuente": "CONSOLIDADO"
+                                }
+                            ] if resultado_consolidado.contacto and (resultado_consolidado.contacto.telefono or resultado_consolidado.contacto.email) else [],
+                            "consolidacion_exitosa": True,
+                            "fuente": "CONSOLIDADO_SUNAT_OSCE_ENHANCED"
+                        },
+                        "timestamp": datetime.now().isoformat()
+                    }
+            except Exception as fallback_error:
+                print(f"⚠️ Fallback SUNAT también falló: {fallback_error}")
+        
+        # Return original consolidation result
         return {
             "success": True,
             "data": {
