@@ -4,7 +4,7 @@ Servicio mejorado para gestionar empresas en Turso
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-import libsql
+from libsql_client import create_client_sync
 from app.core.database_turso import get_turso_config
 from app.models.empresa import EmpresaDB
 
@@ -22,8 +22,8 @@ class EmpresaServiceTurso:
         try:
             url, token = get_turso_config()
             if url and token:
-                # Conectar con libsql usando parámetros separados
-                self.client = libsql.connect(url, auth_token=token)
+                # Conectar con libsql-client usando la API correcta
+                self.client = create_client_sync(url=url, auth_token=token)
                 logger.info("✅ Cliente Turso inicializado")
             else:
                 logger.warning("⚠️ Turso no configurado, usando modo degradado")
