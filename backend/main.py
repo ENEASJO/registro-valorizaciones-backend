@@ -703,7 +703,45 @@ async def empresas_guardadas():
         "timestamp": datetime.now().isoformat()
     }
 
-# ENDPOINTS PARA OSCE OPTIMIZADO
+# ENDPOINTS PARA OSCE ULTRA-OPTIMIZADO
+@app.post("/api/osce/consulta-turbo")
+async def consulta_osce_turbo(ruc_input: RUCInput):
+    """Consulta OSCE TURBO - Extracción ultra-rápida en 3-8 segundos"""
+    ruc = ruc_input.ruc.strip()
+    
+    print(f"⚡ Consulta OSCE TURBO para RUC: {ruc}")
+    
+    try:
+        from app.services.osce_turbo_service import osce_turbo
+        from app.services.precache_service import precache_service
+        
+        # Registrar consulta para análisis predictivo
+        precache_service.registrar_consulta(ruc)
+        
+        # Ejecutar consulta TURBO
+        resultado = await osce_turbo.consultar_turbo(ruc)
+        
+        # Trigger pre-cache en background para RUCs relacionados (sin esperar)
+        asyncio.create_task(precache_service.ejecutar_precache())
+        
+        return resultado
+        
+    except ImportError as e:
+        print(f"⚠️ Servicio OSCE TURBO no disponible: {e}")
+        return {
+            "success": False,
+            "error": "Servicio OSCE TURBO no disponible",
+            "fallback": "Usar endpoint /consultar-ruc para funcionalidad básica",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        print(f"❌ Error en consulta OSCE TURBO: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
 @app.post("/api/osce/consulta-optimizada")
 async def consulta_osce_optimizada(ruc_input: RUCInput):
     """Consulta OSCE con optimizaciones avanzadas: caché, paralelización y fallbacks"""
@@ -770,6 +808,47 @@ async def limpiar_cache_osce(ruc: str):
         return {
             "success": False,
             "error": "Servicio de caché no disponible",
+            "timestamp": datetime.now().isoformat()
+        }
+
+# ENDPOINTS PARA PRE-CACHING INTELIGENTE
+@app.post("/api/osce/precache")
+async def ejecutar_precache():
+    """Ejecutar pre-caching manual de RUCs populares"""
+    try:
+        from app.services.precache_service import precache_service
+        
+        resultado = await precache_service.ejecutar_precache()
+        return {
+            "success": True,
+            "data": resultado,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except ImportError:
+        return {
+            "success": False,
+            "error": "Servicio de pre-caching no disponible",
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/osce/precache-stats")
+async def estadisticas_precache():
+    """Obtener estadísticas del sistema de pre-caching"""
+    try:
+        from app.services.precache_service import precache_service
+        
+        stats = precache_service.get_estadisticas()
+        return {
+            "success": True,
+            "data": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except ImportError:
+        return {
+            "success": False,
+            "error": "Servicio de pre-caching no disponible",
             "timestamp": datetime.now().isoformat()
         }
 

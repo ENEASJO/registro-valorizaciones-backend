@@ -49,3 +49,8 @@ alembic==1.13.1
 # Additional utilities for async work
 asyncio==3.4.3
 aiofiles==23.2.1
+
+# TURBO optimizations dependencies
+aiohttp==3.9.1
+beautifulsoup4==4.12.2
+lxml==4.9.3
