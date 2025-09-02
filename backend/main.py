@@ -564,47 +564,18 @@ async def listar_empresas():
     print("📋 Listando empresas desde Turso...")
     
     try:
-        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        from app.services.empresa_service_simple import empresa_service_simple
         
-        empresa_service = EmpresaServiceTurso()
-        # Por ahora usaremos un método simple para listar
-        # Si no existe el método get_all_empresas, haremos una consulta SQL directa
+        empresas = empresa_service_simple.listar_empresas()
         
-        if empresa_service.client:
-            print("💾 Consultando directamente a Turso...")
-            result = empresa_service.client.execute("SELECT * FROM empresas ORDER BY created_at DESC LIMIT 50")
-            
-            empresas = []
-            if result and hasattr(result, 'rows'):
-                for row in result.rows:
-                    empresas.append({
-                        "id": row[0],
-                        "codigo": row[1],
-                        "ruc": row[2],
-                        "razon_social": row[3],
-                        "email": row[4],
-                        "telefono": row[5],
-                        "direccion": row[6],
-                        "estado": row[7]
-                    })
-            
-            print(f"✅ Encontradas {len(empresas)} empresas en Turso")
-            return {
-                "success": True,
-                "data": empresas,
-                "total": len(empresas),
-                "message": "Empresas obtenidas desde Turso",
-                "timestamp": datetime.now().isoformat()
-            }
-        else:
-            print("⚠️ Cliente Turso no disponible")
-            return {
-                "success": True,
-                "data": [],
-                "total": 0,
-                "message": "Cliente Turso no disponible",
-                "timestamp": datetime.now().isoformat()
-            }
+        print(f"✅ Encontradas {len(empresas)} empresas en Turso")
+        return {
+            "success": True,
+            "data": empresas,
+            "total": len(empresas),
+            "message": "Empresas obtenidas desde Turso",
+            "timestamp": datetime.now().isoformat()
+        }
             
     except Exception as e:
         print(f"❌ Error listando desde Turso: {e}")
@@ -622,14 +593,10 @@ async def crear_empresa(data: dict):
     print(f"📝 Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
     
     try:
-        # Intentar guardar en Turso
-        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        # Usar el servicio simple de Turso
+        from app.services.empresa_service_simple import empresa_service_simple
         
-        empresa_service = EmpresaServiceTurso()
-        empresa_id = empresa_service.save_empresa_from_consulta(
-            ruc=data.get('ruc', ''),
-            datos_consulta=data
-        )
+        empresa_id = empresa_service_simple.guardar_empresa(data)
         
         if empresa_id:
             print(f"✅ Empresa guardada en Turso con ID: {empresa_id}")
