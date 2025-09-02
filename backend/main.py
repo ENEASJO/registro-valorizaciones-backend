@@ -850,3 +850,92 @@ async def crear_empresa_temporal(empresa: EmpresaCreate):
         "message": "Empresa guardada temporalmente (esperando router completo)",
         "timestamp": datetime.now().isoformat()
     }
+
+# ENDPOINTS DE PRUEBA SUPABASE
+@app.post("/api/supabase/empresas")
+async def crear_empresa_supabase(data: dict):
+    """Crear empresa en Supabase (prueba)"""
+    print(f"📝 [SUPABASE] Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
+    
+    try:
+        from app.services.empresa_service_supabase import empresa_service_supabase
+        
+        empresa_id = empresa_service_supabase.guardar_empresa(data)
+        
+        if empresa_id:
+            print(f"✅ [SUPABASE] Empresa guardada con ID: {empresa_id}")
+            return {
+                "success": True,
+                "data": {"id": empresa_id, **data},
+                "message": "Empresa guardada exitosamente en Supabase",
+                "fuente": "supabase",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            print("⚠️ [SUPABASE] Error guardando empresa")
+            return {
+                "success": False,
+                "data": data,
+                "message": "Error guardando en Supabase",
+                "fuente": "supabase",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        print(f"❌ [SUPABASE] Error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Error en servicio Supabase: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/supabase/empresas")
+async def listar_empresas_supabase():
+    """Listar empresas desde Supabase (prueba)"""
+    print("📋 [SUPABASE] Listando empresas...")
+    
+    try:
+        from app.services.empresa_service_supabase import empresa_service_supabase
+        
+        empresas = empresa_service_supabase.listar_empresas()
+        
+        print(f"✅ [SUPABASE] Encontradas {len(empresas)} empresas")
+        return {
+            "success": True,
+            "data": empresas,
+            "total": len(empresas),
+            "message": "Empresas obtenidas desde Supabase",
+            "fuente": "supabase",
+            "timestamp": datetime.now().isoformat()
+        }
+            
+    except Exception as e:
+        print(f"❌ [SUPABASE] Error listando: {e}")
+        return {
+            "success": False,
+            "data": [],
+            "total": 0,
+            "error": str(e),
+            "message": f"Error listando desde Supabase: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/supabase/stats")
+async def stats_supabase():
+    """Estadísticas de Supabase"""
+    try:
+        from app.services.empresa_service_supabase import empresa_service_supabase
+        
+        stats = empresa_service_supabase.get_stats()
+        return {
+            "success": True,
+            "data": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
