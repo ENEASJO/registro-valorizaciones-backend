@@ -14,6 +14,26 @@ app = FastAPI(
     version="4.2.1"
 )
 
+# Lazy loading de routers para evitar errores de importación al inicio
+def setup_routers():
+    """Configurar routers cuando se necesiten"""
+    try:
+        from app.api.routes.empresas import router as empresas_router
+        app.include_router(empresas_router)
+        print("✅ Router de empresas cargado")
+    except ImportError as e:
+        print(f"⚠️ No se pudo cargar router de empresas: {e}")
+
+# Variable para controlar si los routers ya fueron cargados
+_routers_loaded = False
+
+def ensure_routers_loaded():
+    """Asegurar que los routers estén cargados"""
+    global _routers_loaded
+    if not _routers_loaded:
+        setup_routers()
+        _routers_loaded = True
+
 # CORS básico
 app.add_middleware(
     CORSMiddleware,
@@ -22,6 +42,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Cargar routers al startup
+@app.on_event("startup")
+async def startup_event():
+    """Cargar routers al iniciar la aplicación"""
+    ensure_routers_loaded()
 
 # Variable global para Playwright helper (lazy loading)
 _playwright_helper = None
@@ -42,10 +68,13 @@ def get_playwright_helper():
 # Endpoints que arrancan inmediatamente
 @app.get("/")
 async def root():
+    # Cargar routers si no han sido cargados
+    ensure_routers_loaded()
     return {
         "message": "API de Valorizaciones - Inicio Rápido ⚡",
         "status": "OK",
         "fast_start": True,
+        "routers_loaded": _routers_loaded,
         "timestamp": datetime.now().isoformat()
     }
 
