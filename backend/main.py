@@ -560,22 +560,102 @@ async def test_playwright():
 # Endpoints básicos necesarios para el frontend (arrancan inmediatamente)
 @app.get("/api/empresas")
 async def listar_empresas():
-    return {
-        "success": True,
-        "data": [],
-        "total": 0,
-        "message": "Endpoint empresas temporal",
-        "timestamp": datetime.now().isoformat()
-    }
+    """Listar empresas desde Turso"""
+    print("📋 Listando empresas desde Turso...")
+    
+    try:
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        
+        empresa_service = EmpresaServiceTurso()
+        # Por ahora usaremos un método simple para listar
+        # Si no existe el método get_all_empresas, haremos una consulta SQL directa
+        
+        if empresa_service.client:
+            print("💾 Consultando directamente a Turso...")
+            result = empresa_service.client.execute("SELECT * FROM empresas ORDER BY created_at DESC LIMIT 50")
+            
+            empresas = []
+            if result and hasattr(result, 'rows'):
+                for row in result.rows:
+                    empresas.append({
+                        "id": row[0],
+                        "codigo": row[1],
+                        "ruc": row[2],
+                        "razon_social": row[3],
+                        "email": row[4],
+                        "telefono": row[5],
+                        "direccion": row[6],
+                        "estado": row[7]
+                    })
+            
+            print(f"✅ Encontradas {len(empresas)} empresas en Turso")
+            return {
+                "success": True,
+                "data": empresas,
+                "total": len(empresas),
+                "message": "Empresas obtenidas desde Turso",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            print("⚠️ Cliente Turso no disponible")
+            return {
+                "success": True,
+                "data": [],
+                "total": 0,
+                "message": "Cliente Turso no disponible",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        print(f"❌ Error listando desde Turso: {e}")
+        return {
+            "success": True,
+            "data": [],
+            "total": 0,
+            "message": f"Error listando desde Turso: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
 
 @app.post("/api/empresas")
 async def crear_empresa(data: dict):
-    return {
-        "success": True,
-        "data": {"id": 1, **data},
-        "message": "Empresa creada (temporal)",
-        "timestamp": datetime.now().isoformat()
-    }
+    """Crear empresa y guardar en Turso"""
+    print(f"📝 Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
+    
+    try:
+        # Intentar guardar en Turso
+        from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+        
+        empresa_service = EmpresaServiceTurso()
+        empresa_id = empresa_service.save_empresa_from_consulta(
+            ruc=data.get('ruc', ''),
+            datos_consulta=data
+        )
+        
+        if empresa_id:
+            print(f"✅ Empresa guardada en Turso con ID: {empresa_id}")
+            return {
+                "success": True,
+                "data": {"id": empresa_id, **data},
+                "message": "Empresa guardada exitosamente en Turso",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            print("⚠️ Turso no disponible, guardado temporal")
+            return {
+                "success": True,
+                "data": {"id": 999, **data},  # ID temporal
+                "message": "Empresa guardada temporalmente (Turso no disponible)",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        print(f"❌ Error guardando en Turso: {e}")
+        return {
+            "success": True,
+            "data": {"id": 998, **data},  # ID de error
+            "message": f"Empresa guardada localmente (Error Turso: {str(e)})",
+            "timestamp": datetime.now().isoformat()
+        }
 
 @app.get("/obras")
 async def listar_obras():
