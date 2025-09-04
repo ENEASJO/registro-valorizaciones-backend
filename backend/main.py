@@ -560,67 +560,109 @@ async def test_playwright():
 # Endpoints básicos necesarios para el frontend (arrancan inmediatamente)
 @app.get("/api/empresas")
 async def listar_empresas():
-    """Listar empresas desde Turso"""
-    print("📋 Listando empresas desde Turso...")
+    """Listar empresas desde Supabase"""
+    print("📋 Listando empresas desde Supabase...")
     
     try:
-        from app.services.empresa_service_simple import empresa_service_simple
+        from app.services.empresa_service_supabase import empresa_service_supabase
         
-        empresas = empresa_service_simple.listar_empresas()
+        empresas = empresa_service_supabase.listar_empresas()
         
-        print(f"✅ Encontradas {len(empresas)} empresas en Turso")
+        print(f"✅ Encontradas {len(empresas)} empresas en Supabase")
         return {
             "success": True,
             "data": empresas,
             "total": len(empresas),
-            "message": "Empresas obtenidas desde Turso",
+            "message": "Empresas obtenidas desde Supabase",
             "timestamp": datetime.now().isoformat()
         }
             
     except Exception as e:
-        print(f"❌ Error listando desde Turso: {e}")
-        return {
-            "success": True,
-            "data": [],
-            "total": 0,
-            "message": f"Error listando desde Turso: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        }
+        print(f"❌ Error listando desde Supabase: {e}")
+        # Fallback a Turso si falla Supabase
+        try:
+            from app.services.empresa_service_simple import empresa_service_simple
+            empresas = empresa_service_simple.listar_empresas()
+            print(f"✅ Fallback Turso: {len(empresas)} empresas")
+            return {
+                "success": True,
+                "data": empresas,
+                "total": len(empresas),
+                "message": f"Empresas desde Turso (Supabase error: {str(e)})",
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as turso_error:
+            print(f"❌ Fallback Turso también falló: {turso_error}")
+            return {
+                "success": True,
+                "data": [],
+                "total": 0,
+                "message": f"Error en ambas bases: Supabase({str(e)}), Turso({str(turso_error)})",
+                "timestamp": datetime.now().isoformat()
+            }
 
 @app.post("/api/empresas")
 async def crear_empresa(data: dict):
-    """Crear empresa y guardar en Turso"""
+    """Crear empresa y guardar en Supabase"""
     print(f"📝 Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
     
     try:
-        # Usar el servicio simple de Turso
-        from app.services.empresa_service_simple import empresa_service_simple
+        # Usar el servicio de Supabase
+        from app.services.empresa_service_supabase import empresa_service_supabase
         
-        empresa_id = empresa_service_simple.guardar_empresa(data)
+        empresa_id = empresa_service_supabase.guardar_empresa(data)
         
         if empresa_id:
-            print(f"✅ Empresa guardada en Turso con ID: {empresa_id}")
+            print(f"✅ Empresa guardada en Supabase con ID: {empresa_id}")
             return {
                 "success": True,
                 "data": {"id": empresa_id, **data},
-                "message": "Empresa guardada exitosamente en Turso",
+                "message": "Empresa guardada exitosamente en Supabase",
                 "timestamp": datetime.now().isoformat()
             }
         else:
-            print("⚠️ Turso no disponible, guardado temporal")
+            print("⚠️ Supabase falló, intentando Turso fallback...")
+            # Fallback a Turso si falla Supabase
+            try:
+                from app.services.empresa_service_simple import empresa_service_simple
+                turso_id = empresa_service_simple.guardar_empresa(data)
+                if turso_id:
+                    return {
+                        "success": True,
+                        "data": {"id": turso_id, **data},
+                        "message": "Empresa guardada en Turso (Supabase no disponible)",
+                        "timestamp": datetime.now().isoformat()
+                    }
+            except Exception as turso_error:
+                print(f"❌ Turso fallback también falló: {turso_error}")
+            
             return {
                 "success": True,
                 "data": {"id": 999, **data},  # ID temporal
-                "message": "Empresa guardada temporalmente (Turso no disponible)",
+                "message": "Empresa guardada temporalmente (ambas bases fallaron)",
                 "timestamp": datetime.now().isoformat()
             }
             
     except Exception as e:
-        print(f"❌ Error guardando en Turso: {e}")
+        print(f"❌ Error guardando en Supabase: {e}")
+        # Fallback a Turso
+        try:
+            from app.services.empresa_service_simple import empresa_service_simple
+            turso_id = empresa_service_simple.guardar_empresa(data)
+            if turso_id:
+                return {
+                    "success": True,
+                    "data": {"id": turso_id, **data},
+                    "message": f"Empresa guardada en Turso (Supabase error: {str(e)})",
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as turso_error:
+            print(f"❌ Turso fallback falló: {turso_error}")
+        
         return {
             "success": True,
             "data": {"id": 998, **data},  # ID de error
-            "message": f"Empresa guardada localmente (Error Turso: {str(e)})",
+            "message": f"Empresa guardada localmente (ambas bases fallaron)",
             "timestamp": datetime.now().isoformat()
         }
 

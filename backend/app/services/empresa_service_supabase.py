@@ -15,7 +15,7 @@ class EmpresaServiceSupabase:
     
     def __init__(self):
         self.supabase_url = "https://ujujrbedclmsdkjcupec.supabase.co"
-        self.anon_key = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqdWpyYmVkY2xtc2RramN1cGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUxOTM0NzQsImV4cCI6MjA1MDc2OTQ3NH0.1QEgc7dI9V0npf0YpFsQNOI5aLJGUBsZE73IvQNMOyE")
+        self.anon_key = os.getenv("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqdWpyYmVkY2xtc2RramN1cGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MzE1MTYsImV4cCI6MjA3MjQwNzUxNn0.X4LtoBuIgStdZundCd-DSwas1UN07xQUl6lA7aFP3t8")
         
         self.headers = {
             'apikey': self.anon_key,
