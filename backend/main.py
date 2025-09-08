@@ -764,13 +764,11 @@ async def listar_empresas_directo():
         print(f"✅ [GET DIRECTO] Encontradas {len(empresas)} empresas en Neon")
         return {
             "success": True,
-            "data": {
-                "empresas": empresas,
-                "total": len(empresas),
-                "page": 1,
-                "per_page": 50,
-                "total_pages": 1
-            },
+            "data": empresas,  # ARREGLO: data debe ser directamente el array
+            "total": len(empresas),
+            "page": 1,
+            "per_page": 50,
+            "total_pages": 1,
             "message": f"Se encontraron {len(empresas)} empresa(s)",
             "timestamp": datetime.now().isoformat()
         }
@@ -779,13 +777,11 @@ async def listar_empresas_directo():
         print(f"❌ [GET DIRECTO] Error listando empresas: {e}")
         return {
             "success": False,
-            "data": {
-                "empresas": [],
-                "total": 0,
-                "page": 1,
-                "per_page": 50,
-                "total_pages": 0
-            },
+            "data": [],  # ARREGLO: data debe ser directamente el array vacío
+            "total": 0,
+            "page": 1,
+            "per_page": 50,
+            "total_pages": 0,
             "message": f"Error obteniendo empresas: {str(e)}",
             "timestamp": datetime.now().isoformat()
         }
