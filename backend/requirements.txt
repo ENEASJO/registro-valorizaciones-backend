@@ -19,9 +19,10 @@ typing-extensions==4.8.0
 # HTTP client para consultas externas
 httpx==0.25.2
 
-# Database dependencies - Compatible versions
-libsql-client==0.3.0
+# Database dependencies - Neon PostgreSQL compatible
+asyncpg==0.29.0
 databases[asyncpg]==0.9.0
+psycopg2-binary==2.9.9
 
 # Production dependencies para Cloud Run
 gunicorn==21.2.0

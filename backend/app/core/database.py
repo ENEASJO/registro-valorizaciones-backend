@@ -14,11 +14,18 @@ from sqlalchemy.orm import declarative_base
 from databases import Database
 from app.core.config import settings
 
-# Database URL con soporte async
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "sqlite+aiosqlite:///./valoraciones.db"
-)
+# Database URL con soporte async - Prioritiza Neon
+NEON_CONNECTION_STRING = os.getenv("NEON_CONNECTION_STRING")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if NEON_CONNECTION_STRING:
+    # Convertir PostgreSQL connection string a async
+    if NEON_CONNECTION_STRING.startswith("postgresql://"):
+        DATABASE_URL = NEON_CONNECTION_STRING.replace("postgresql://", "postgresql+asyncpg://")
+    else:
+        DATABASE_URL = NEON_CONNECTION_STRING
+elif not DATABASE_URL:
+    DATABASE_URL = "sqlite+aiosqlite:///./valoraciones.db"
 
 # Motor async de SQLAlchemy
 engine = create_async_engine(

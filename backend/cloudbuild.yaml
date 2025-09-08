@@ -27,8 +27,8 @@ steps:
     - '--set-env-vars=LOG_LEVEL=INFO'
     - '--set-env-vars=HOST=0.0.0.0'
     - '--set-env-vars=PORT=8080'
-    - '--update-env-vars=TURSO_DATABASE_URL=$(TURSO_DATABASE_URL)'
-    - '--update-env-vars=TURSO_AUTH_TOKEN=$(TURSO_AUTH_TOKEN)'
+    - '--update-env-vars=NEON_CONNECTION_STRING=$(NEON_CONNECTION_STRING)'
+    - '--update-env-vars=DATABASE_URL=$(NEON_CONNECTION_STRING)'
 
 images:
   - 'gcr.io/$PROJECT_ID/registro-valorizaciones:$COMMIT_SHA'
