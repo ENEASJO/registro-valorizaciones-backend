@@ -747,20 +747,18 @@ async def eliminar_empresa_directo(empresa_id: str):
         resultado = empresa_service_neon.eliminar_empresa(empresa_id)
         
         if not resultado:
-            from fastapi import HTTPException, status
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Empresa no encontrada: {empresa_id}"
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"Empresa no encontrada: {empresa_id}"}
             )
             
         return {"message": "Empresa eliminada correctamente"}
         
     except Exception as e:
         print(f"❌ Error eliminando empresa {empresa_id}: {e}")
-        from fastapi import HTTPException, status
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error interno del servidor al eliminar empresa"
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Error interno del servidor al eliminar empresa"}
         )
 
 @app.get("/api/empresas-guardadas")
