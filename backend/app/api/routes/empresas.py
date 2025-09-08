@@ -274,10 +274,12 @@ async def actualizar_empresa(
 async def eliminar_empresa(
     empresa_id: str
 ):
-    """Eliminar empresa usando el servicio Turso (consistente con crear/listar)"""
+    """Eliminar empresa usando el servicio Neon PostgreSQL (consistente con GET/LIST)"""
     try:
-        # Usar el mismo servicio que se usa para crear y listar empresas
-        resultado = empresa_service.delete_empresa(empresa_id)
+        # FIJO: Usar el mismo servicio que usa GET/LIST (Neon PostgreSQL)
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        resultado = empresa_service_neon.eliminar_empresa(empresa_id)
         
         if not resultado:
             raise HTTPException(
