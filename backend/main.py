@@ -16,22 +16,30 @@ app = FastAPI(
 
 # Lazy loading de routers para evitar errores de importación al inicio
 def setup_routers():
-    """Configurar routers cuando se necesiten"""
+    # Docstring convertido a comentario
     try:
+        print("📦 Intentando cargar router de empresas...")
         from app.api.routes.empresas import router as empresas_router
         app.include_router(empresas_router)
-        print("✅ Router de empresas cargado")
+        print("✅ Router de empresas cargado exitosamente")
         print(f"📋 Rutas registradas: {[route.path for route in empresas_router.routes]}")
+        return True
     except ImportError as e:
-        print(f"⚠️ No se pudo cargar router de empresas: {e}")
+        print(f"⚠️ No se pudo cargar router de empresas (ImportError): {e}")
+        import traceback
+        traceback.print_exc()
+        return False
     except Exception as e:
         print(f"❌ Error inesperado cargando router de empresas: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 # Variable para controlar si los routers ya fueron cargados
 _routers_loaded = False
 
 def ensure_routers_loaded():
-    """Asegurar que los routers estén cargados"""
+    # Docstring convertido a comentario
     global _routers_loaded
     if not _routers_loaded:
         setup_routers()
@@ -49,14 +57,23 @@ app.add_middleware(
 # Cargar routers al startup
 @app.on_event("startup")
 async def startup_event():
-    """Cargar routers al iniciar la aplicación"""
-    ensure_routers_loaded()
+    # Docstring convertido a comentario
+    try:
+        print("🚀 Iniciando aplicación FastAPI...")
+        ensure_routers_loaded()
+        print("✅ Startup completado exitosamente")
+    except Exception as e:
+        print(f"❌ Error crítico en startup: {e}")
+        import traceback
+        traceback.print_exc()
+        # No raise el error para permitir que el contenedor inicie
+        print("⚠️ Continuando sin routers cargados...")
 
 # Variable global para Playwright helper (lazy loading)
 _playwright_helper = None
 
 def get_playwright_helper():
-    """Cargar Playwright helper solo cuando se necesite"""
+    # Docstring convertido a comentario
     global _playwright_helper
     if _playwright_helper is None:
         try:
@@ -96,7 +113,7 @@ class RUCInput(BaseModel):
 # Endpoint de scraping SUNAT (con lazy loading)
 @app.post("/consultar-ruc")
 async def consultar_ruc_sunat(ruc_input: RUCInput):
-    """Consultar RUC en SUNAT usando Playwright (carga lazy)"""
+    # Docstring convertido a comentario
     ruc = ruc_input.ruc.strip()
     
     print(f"🔍 Consultando RUC: {ruc}")
@@ -395,7 +412,7 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
 # Endpoint GET consolidado SUNAT + OSCE (funcionalidad completa restaurada)
 @app.get("/consulta-ruc-consolidada/{ruc}")
 async def consultar_ruc_consolidado(ruc: str):
-    """Consulta consolidada de SUNAT + OSCE - FUNCIONALIDAD COMPLETA"""
+    # Docstring convertido a comentario
     print(f"🔍 Iniciando consulta consolidada para RUC: {ruc}")
     
     # Validación básica
@@ -519,7 +536,7 @@ async def consultar_ruc_consolidado(ruc: str):
 # Test de Playwright (lazy loading)
 @app.get("/debug/playwright-test")
 async def test_playwright():
-    """Endpoint para probar que Playwright funcione básicamente"""
+    # Docstring convertido a comentario
     try:
         from playwright.async_api import async_playwright
         print("📦 Playwright importado para test")
@@ -621,10 +638,9 @@ async def listar_empresas():
                 }
 """
 
-"""
 @app.post("/api/empresas")
 async def crear_empresa(data: dict):
-    """Crear empresa y guardar en Neon PostgreSQL"""
+    # Docstring convertido a comentario
     print(f"📝 Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
     
     try:
@@ -700,7 +716,6 @@ async def crear_empresa(data: dict):
             "message": f"Empresa guardada localmente (ambas bases fallaron)",
             "timestamp": datetime.now().isoformat()
         }
-"""
 
 @app.get("/obras")
 async def listar_obras():
@@ -740,7 +755,7 @@ async def crear_valorizacion(data: dict):
 
 @app.delete("/api/empresas/{empresa_id}")
 async def eliminar_empresa_directo(empresa_id: str):
-    """Eliminar empresa - ENDPOINT DIRECTO (solución temporal para 404)"""
+    # Docstring convertido a comentario
     try:
         from app.services.empresa_service_neon import empresa_service_neon
         
@@ -774,7 +789,7 @@ async def empresas_guardadas():
 # ENDPOINTS PARA OSCE ULTRA-OPTIMIZADO
 @app.post("/api/osce/consulta-turbo")
 async def consulta_osce_turbo(ruc_input: RUCInput):
-    """Consulta OSCE TURBO - Extracción ultra-rápida en 3-8 segundos"""
+    # Docstring convertido a comentario
     ruc = ruc_input.ruc.strip()
     
     print(f"⚡ Consulta OSCE TURBO para RUC: {ruc}")
@@ -812,7 +827,7 @@ async def consulta_osce_turbo(ruc_input: RUCInput):
 
 @app.post("/api/osce/consulta-optimizada")
 async def consulta_osce_optimizada(ruc_input: RUCInput):
-    """Consulta OSCE con optimizaciones avanzadas: caché, paralelización y fallbacks"""
+    # Docstring convertido a comentario
     ruc = ruc_input.ruc.strip()
     
     print(f"🚀 Consulta OSCE optimizada para RUC: {ruc}")
@@ -841,7 +856,7 @@ async def consulta_osce_optimizada(ruc_input: RUCInput):
 
 @app.get("/api/osce/cache-stats")
 async def estadisticas_cache_osce():
-    """Obtener estadísticas del caché OSCE"""
+    # Docstring convertido a comentario
     try:
         from app.services.osce_service_optimized import osce_service_optimized
         
@@ -861,7 +876,7 @@ async def estadisticas_cache_osce():
 
 @app.delete("/api/osce/cache/{ruc}")
 async def limpiar_cache_osce(ruc: str):
-    """Limpiar caché para un RUC específico"""
+    # Docstring convertido a comentario
     try:
         from app.services.osce_service_optimized import osce_service_optimized
         
@@ -882,7 +897,7 @@ async def limpiar_cache_osce(ruc: str):
 # ENDPOINTS PARA PRE-CACHING INTELIGENTE
 @app.post("/api/osce/precache")
 async def ejecutar_precache():
-    """Ejecutar pre-caching manual de RUCs populares"""
+    # Docstring convertido a comentario
     try:
         from app.services.precache_service import precache_service
         
@@ -902,7 +917,7 @@ async def ejecutar_precache():
 
 @app.get("/api/osce/precache-stats")
 async def estadisticas_precache():
-    """Obtener estadísticas del sistema de pre-caching"""
+    # Docstring convertido a comentario
     try:
         from app.services.precache_service import precache_service
         
@@ -934,7 +949,7 @@ class EmpresaCreate(BaseModel):
 
 @app.post("/api/v1/empresas")
 async def crear_empresa_temporal(empresa: EmpresaCreate):
-    """Endpoint temporal para crear empresas mientras el router se activa"""
+    # Docstring convertido a comentario
     print(f"📝 Recibiendo empresa temporal: {empresa.ruc} - {empresa.razon_social}")
     
     # Cargar routers si no están cargados
@@ -955,7 +970,7 @@ async def crear_empresa_temporal(empresa: EmpresaCreate):
 # ENDPOINT TEMPORAL DE DELETE PARA DEBUGGING
 @app.delete("/api/empresas/{empresa_id}")
 async def eliminar_empresa_temporal(empresa_id: str):
-    """Endpoint temporal DELETE para debugging - usa Neon PostgreSQL"""
+    # Docstring convertido a comentario
     try:
         from app.services.empresa_service_neon import empresa_service_neon
         
@@ -988,7 +1003,7 @@ async def eliminar_empresa_temporal(empresa_id: str):
 # ENDPOINTS DE PRUEBA SUPABASE
 @app.post("/api/supabase/empresas")
 async def crear_empresa_supabase(data: dict):
-    """Crear empresa en Supabase (prueba)"""
+    # Crear empresa en Supabase (prueba)
     print(f"📝 [SUPABASE] Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
     
     try:
@@ -1026,7 +1041,7 @@ async def crear_empresa_supabase(data: dict):
 
 @app.get("/api/supabase/empresas")
 async def listar_empresas_supabase():
-    """Listar empresas desde Supabase (prueba)"""
+    # Listar empresas desde Supabase (prueba)
     print("📋 [SUPABASE] Listando empresas...")
     
     try:
@@ -1057,7 +1072,7 @@ async def listar_empresas_supabase():
 
 @app.get("/api/supabase/stats")
 async def stats_supabase():
-    """Estadísticas de Supabase"""
+    # Estadisticas de Supabase
     try:
         from app.services.empresa_service_supabase import empresa_service_supabase
         
