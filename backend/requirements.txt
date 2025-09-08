@@ -19,9 +19,9 @@ typing-extensions==4.8.0
 # HTTP client para consultas externas
 httpx==0.25.2
 
-# Database dependencies - Turso
+# Database dependencies - Compatible versions
 libsql-client==0.3.0
-databases[asyncpg]==0.8.0
+databases[asyncpg]==0.9.0
 
 # Production dependencies para Cloud Run
 gunicorn==21.2.0
@@ -51,7 +51,6 @@ alembic==1.13.1
 asyncio==3.4.3
 aiofiles==23.2.1
 
-# TURBO optimizations dependencies
-aiohttp==3.9.1
+# Web scraping and parsing
 beautifulsoup4==4.12.2
 lxml==4.9.3
