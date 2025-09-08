@@ -560,69 +560,97 @@ async def test_playwright():
 # Endpoints básicos necesarios para el frontend (arrancan inmediatamente)
 @app.get("/api/empresas")
 async def listar_empresas():
-    """Listar empresas desde Supabase"""
-    print("📋 Listando empresas desde Supabase...")
+    """Listar empresas desde Neon PostgreSQL"""
+    print("📋 Listando empresas desde Neon...")
     
     try:
-        from app.services.empresa_service_supabase import empresa_service_supabase
+        from app.services.empresa_service_neon import empresa_service_neon
         
-        empresas = empresa_service_supabase.listar_empresas()
+        empresas = empresa_service_neon.listar_empresas()
         
-        print(f"✅ Encontradas {len(empresas)} empresas en Supabase")
+        print(f"✅ Encontradas {len(empresas)} empresas en Neon")
         return {
             "success": True,
             "data": empresas,
             "total": len(empresas),
-            "message": "Empresas obtenidas desde Supabase",
+            "message": "Empresas obtenidas desde Neon PostgreSQL",
             "timestamp": datetime.now().isoformat()
         }
             
     except Exception as e:
-        print(f"❌ Error listando desde Supabase: {e}")
-        # Fallback a Turso si falla Supabase
+        print(f"❌ Error listando desde Neon: {e}")
+        # Fallback a Supabase si falla Neon
         try:
-            from app.services.empresa_service_simple import empresa_service_simple
-            empresas = empresa_service_simple.listar_empresas()
-            print(f"✅ Fallback Turso: {len(empresas)} empresas")
+            from app.services.empresa_service_supabase import empresa_service_supabase
+            empresas = empresa_service_supabase.listar_empresas()
+            print(f"✅ Fallback Supabase: {len(empresas)} empresas")
             return {
                 "success": True,
                 "data": empresas,
                 "total": len(empresas),
-                "message": f"Empresas desde Turso (Supabase error: {str(e)})",
+                "message": f"Empresas desde Supabase (Neon error: {str(e)})",
                 "timestamp": datetime.now().isoformat()
             }
-        except Exception as turso_error:
-            print(f"❌ Fallback Turso también falló: {turso_error}")
-            return {
-                "success": True,
-                "data": [],
-                "total": 0,
-                "message": f"Error en ambas bases: Supabase({str(e)}), Turso({str(turso_error)})",
-                "timestamp": datetime.now().isoformat()
-            }
+        except Exception as supabase_error:
+            print(f"❌ Supabase fallback falló: {supabase_error}")
+            # Último fallback a Turso
+            try:
+                from app.services.empresa_service_simple import empresa_service_simple
+                empresas = empresa_service_simple.listar_empresas()
+                print(f"✅ Fallback Turso final: {len(empresas)} empresas")
+                return {
+                    "success": True,
+                    "data": empresas,
+                    "total": len(empresas),
+                    "message": f"Empresas desde Turso (Neon y Supabase fallaron)",
+                    "timestamp": datetime.now().isoformat()
+                }
+            except Exception as turso_error:
+                print(f"❌ Todos los fallbacks fallaron: {turso_error}")
+                return {
+                    "success": True,
+                    "data": [],
+                    "total": 0,
+                    "message": f"Error en todas las bases: Neon({str(e)}), Supabase({str(supabase_error)}), Turso({str(turso_error)})",
+                    "timestamp": datetime.now().isoformat()
+                }
 
 @app.post("/api/empresas")
 async def crear_empresa(data: dict):
-    """Crear empresa y guardar en Supabase"""
+    """Crear empresa y guardar en Neon PostgreSQL"""
     print(f"📝 Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
     
     try:
-        # Usar el servicio de Supabase
-        from app.services.empresa_service_supabase import empresa_service_supabase
+        # Usar el servicio de Neon
+        from app.services.empresa_service_neon import empresa_service_neon
         
-        empresa_id = empresa_service_supabase.guardar_empresa(data)
+        empresa_id = empresa_service_neon.guardar_empresa(data)
         
         if empresa_id:
-            print(f"✅ Empresa guardada en Supabase con ID: {empresa_id}")
+            print(f"✅ Empresa guardada en Neon con ID: {empresa_id}")
             return {
                 "success": True,
                 "data": {"id": empresa_id, **data},
-                "message": "Empresa guardada exitosamente en Supabase",
+                "message": "Empresa guardada exitosamente en Neon PostgreSQL",
                 "timestamp": datetime.now().isoformat()
             }
         else:
-            print("⚠️ Supabase falló, intentando Turso fallback...")
-            # Fallback a Turso si falla Supabase
+            print("⚠️ Neon falló, intentando Supabase fallback...")
+            # Fallback a Supabase si falla Neon
+            try:
+                from app.services.empresa_service_supabase import empresa_service_supabase
+                supabase_id = empresa_service_supabase.guardar_empresa(data)
+                if supabase_id:
+                    return {
+                        "success": True,
+                        "data": {"id": supabase_id, **data},
+                        "message": "Empresa guardada en Supabase (Neon no disponible)",
+                        "timestamp": datetime.now().isoformat()
+                    }
+            except Exception as supabase_error:
+                print(f"❌ Supabase fallback falló: {supabase_error}")
+            
+            # Último fallback a Turso
             try:
                 from app.services.empresa_service_simple import empresa_service_simple
                 turso_id = empresa_service_simple.guardar_empresa(data)
@@ -630,7 +658,7 @@ async def crear_empresa(data: dict):
                     return {
                         "success": True,
                         "data": {"id": turso_id, **data},
-                        "message": "Empresa guardada en Turso (Supabase no disponible)",
+                        "message": "Empresa guardada en Turso (Neon y Supabase fallaron)",
                         "timestamp": datetime.now().isoformat()
                     }
             except Exception as turso_error:
@@ -639,7 +667,7 @@ async def crear_empresa(data: dict):
             return {
                 "success": True,
                 "data": {"id": 999, **data},  # ID temporal
-                "message": "Empresa guardada temporalmente (ambas bases fallaron)",
+                "message": "Empresa guardada temporalmente (todas las bases fallaron)",
                 "timestamp": datetime.now().isoformat()
             }
             
