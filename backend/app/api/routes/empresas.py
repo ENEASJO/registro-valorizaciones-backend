@@ -5,6 +5,9 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, status
 from datetime import datetime
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
 from app.models.empresa import (
@@ -14,7 +17,7 @@ from app.models.empresa import (
     RepresentanteResponse
 )
 
-router = APIRouter(prefix="/api/v1/empresas", tags=["empresas"])
+router = APIRouter(prefix="/api/empresas", tags=["empresas"])
 
 # Instancia del servicio Turso
 empresa_service = EmpresaServiceTurso()

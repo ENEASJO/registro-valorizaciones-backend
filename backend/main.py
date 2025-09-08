@@ -21,8 +21,11 @@ def setup_routers():
         from app.api.routes.empresas import router as empresas_router
         app.include_router(empresas_router)
         print("✅ Router de empresas cargado")
+        print(f"📋 Rutas registradas: {[route.path for route in empresas_router.routes]}")
     except ImportError as e:
         print(f"⚠️ No se pudo cargar router de empresas: {e}")
+    except Exception as e:
+        print(f"❌ Error inesperado cargando router de empresas: {e}")
 
 # Variable para controlar si los routers ya fueron cargados
 _routers_loaded = False
@@ -558,9 +561,11 @@ async def test_playwright():
         }
 
 # Endpoints básicos necesarios para el frontend (arrancan inmediatamente)
+# NOTA: Estos endpoints están comentados porque ahora el router de empresas maneja estas rutas
+"""
 @app.get("/api/empresas")
 async def listar_empresas():
-    """Listar empresas desde Neon PostgreSQL"""
+    # Listar empresas desde Neon PostgreSQL
     print("📋 Listando empresas desde Neon...")
     
     try:
@@ -614,7 +619,9 @@ async def listar_empresas():
                     "message": f"Error en todas las bases: Neon({str(e)}), Supabase({str(supabase_error)}), Turso({str(turso_error)})",
                     "timestamp": datetime.now().isoformat()
                 }
+"""
 
+"""
 @app.post("/api/empresas")
 async def crear_empresa(data: dict):
     """Crear empresa y guardar en Neon PostgreSQL"""
@@ -693,6 +700,7 @@ async def crear_empresa(data: dict):
             "message": f"Empresa guardada localmente (ambas bases fallaron)",
             "timestamp": datetime.now().isoformat()
         }
+"""
 
 @app.get("/obras")
 async def listar_obras():
