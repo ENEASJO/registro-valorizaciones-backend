@@ -786,28 +786,7 @@ async def listar_empresas_directo():
             "timestamp": datetime.now().isoformat()
         }
 
-@app.delete("/api/empresas/{empresa_id}")
-async def eliminar_empresa_directo(empresa_id: str):
-    # Docstring convertido a comentario
-    try:
-        from app.services.empresa_service_neon import empresa_service_neon
-        
-        resultado = empresa_service_neon.eliminar_empresa(empresa_id)
-        
-        if not resultado:
-            return JSONResponse(
-                status_code=404,
-                content={"detail": f"Empresa no encontrada: {empresa_id}"}
-            )
-            
-        return {"message": "Empresa eliminada correctamente"}
-        
-    except Exception as e:
-        print(f"❌ Error eliminando empresa {empresa_id}: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Error interno del servidor al eliminar empresa"}
-        )
+# ELIMINADO: Endpoint DELETE duplicado para evitar conflictos con el router
 
 @app.get("/api/empresas-guardadas")
 async def empresas_guardadas():
@@ -1000,38 +979,7 @@ async def crear_empresa_temporal(empresa: EmpresaCreate):
         "timestamp": datetime.now().isoformat()
     }
 
-# ENDPOINT TEMPORAL DE DELETE PARA DEBUGGING
-@app.delete("/api/empresas/{empresa_id}")
-async def eliminar_empresa_temporal(empresa_id: str):
-    # Docstring convertido a comentario
-    try:
-        from app.services.empresa_service_neon import empresa_service_neon
-        
-        print(f"🗑️ [TEMP DELETE] Eliminando empresa: {empresa_id}")
-        
-        resultado = empresa_service_neon.eliminar_empresa(empresa_id)
-        
-        if not resultado:
-            print(f"❌ [TEMP DELETE] Empresa {empresa_id} no encontrada en Neon")
-            return JSONResponse(
-                status_code=404,
-                content={"detail": f"Empresa no encontrada: {empresa_id}"}
-            )
-        
-        print(f"✅ [TEMP DELETE] Empresa {empresa_id} eliminada exitosamente")
-        return {
-            "success": True,
-            "message": "Empresa eliminada correctamente",
-            "empresa_id": empresa_id,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        print(f"❌ [TEMP DELETE] Error eliminando empresa {empresa_id}: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"detail": f"Error interno: {str(e)}"}
-        )
+# ELIMINADO: Endpoint DELETE temporal duplicado - usar solo el del router
 
 # ENDPOINTS DE PRUEBA SUPABASE
 @app.post("/api/supabase/empresas")

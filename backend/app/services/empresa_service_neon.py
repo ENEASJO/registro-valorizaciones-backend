@@ -68,6 +68,7 @@ class EmpresaServiceNeon:
                 'dni_representante': datos_empresa.get('dni_representante', ''),
                 'estado': datos_empresa.get('estado', 'ACTIVO'),
                 'tipo_empresa': datos_empresa.get('tipo_empresa', 'SAC'),
+            'categoria_contratista': datos_empresa.get('categoria_contratista', None),
                 'datos_sunat': json.dumps(datos_empresa.get('datos_sunat', {})) if datos_empresa.get('datos_sunat') else None,
                 'datos_osce': json.dumps(datos_empresa.get('datos_osce', {})) if datos_empresa.get('datos_osce') else None,
                 'fuentes_consultadas': datos_empresa.get('fuentes_consultadas', [])
@@ -80,14 +81,14 @@ class EmpresaServiceNeon:
                         INSERT INTO empresas (
                             codigo, ruc, razon_social, nombre_comercial, email, telefono, celular,
                             direccion, distrito, provincia, departamento, representante_legal,
-                            dni_representante, estado, tipo_empresa, datos_sunat, datos_osce,
-                            fuentes_consultadas
+                            dni_representante, estado, tipo_empresa, categoria_contratista, 
+                            datos_sunat, datos_osce, fuentes_consultadas
                         ) VALUES (
                             %(codigo)s, %(ruc)s, %(razon_social)s, %(nombre_comercial)s, %(email)s, 
                             %(telefono)s, %(celular)s, %(direccion)s, %(distrito)s, %(provincia)s,
                             %(departamento)s, %(representante_legal)s, %(dni_representante)s,
-                            %(estado)s, %(tipo_empresa)s, %(datos_sunat)s, %(datos_osce)s,
-                            %(fuentes_consultadas)s
+                            %(estado)s, %(tipo_empresa)s, %(categoria_contratista)s,
+                            %(datos_sunat)s, %(datos_osce)s, %(fuentes_consultadas)s
                         )
                         ON CONFLICT (ruc) DO UPDATE SET
                             razon_social = EXCLUDED.razon_social,
@@ -103,6 +104,7 @@ class EmpresaServiceNeon:
                             dni_representante = EXCLUDED.dni_representante,
                             estado = EXCLUDED.estado,
                             tipo_empresa = EXCLUDED.tipo_empresa,
+                            categoria_contratista = EXCLUDED.categoria_contratista,
                             datos_sunat = EXCLUDED.datos_sunat,
                             datos_osce = EXCLUDED.datos_osce,
                             fuentes_consultadas = EXCLUDED.fuentes_consultadas,
@@ -196,31 +198,42 @@ class EmpresaServiceNeon:
     def eliminar_empresa(self, empresa_id: str) -> bool:
         """
         Eliminar empresa de Neon PostgreSQL
+        Intenta por UUID primero, luego por RUC como fallback
         """
         try:
+            logger.info(f"🗑️ Intentando eliminar empresa: {empresa_id}")
+            
             with self._get_connection() as conn:
                 with conn.cursor() as cursor:
-                    # Intentar eliminar por ID (UUID)
-                    query = "DELETE FROM empresas WHERE id = %s;"
-                    cursor.execute(query, (empresa_id,))
+                    # Primero verificar si existe la empresa
+                    cursor.execute("SELECT id, ruc, razon_social FROM empresas WHERE id = %s OR ruc = %s;", 
+                                 (empresa_id, empresa_id))
+                    empresa_existente = cursor.fetchone()
                     
-                    # Si no se eliminó ninguna fila, intentar por RUC
-                    if cursor.rowcount == 0:
-                        query = "DELETE FROM empresas WHERE ruc = %s;"
-                        cursor.execute(query, (empresa_id,))
+                    if not empresa_existente:
+                        logger.warning(f"⚠️ Empresa no encontrada para eliminar: {empresa_id}")
+                        return False
+                    
+                    logger.info(f"📋 Empresa encontrada: ID={empresa_existente['id']}, RUC={empresa_existente['ruc']}, Nombre={empresa_existente['razon_social']}")
+                    
+                    # Eliminar por ID (más preciso)
+                    query = "DELETE FROM empresas WHERE id = %s;"
+                    cursor.execute(query, (empresa_existente['id'],))
                     
                     rows_deleted = cursor.rowcount
                     conn.commit()
                     
                     if rows_deleted > 0:
-                        logger.info(f"✅ Empresa eliminada - ID/RUC: {empresa_id}, filas: {rows_deleted}")
+                        logger.info(f"✅ Empresa eliminada exitosamente - ID: {empresa_existente['id']}, RUC: {empresa_existente['ruc']}")
                         return True
                     else:
-                        logger.warning(f"⚠️ No se encontró empresa para eliminar: {empresa_id}")
+                        logger.error(f"❌ Error: No se pudo eliminar la empresa aunque fue encontrada: {empresa_id}")
                         return False
                         
         except Exception as e:
             logger.error(f"❌ Error eliminando empresa {empresa_id}: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return False
     
     def get_stats(self) -> Dict[str, Any]:

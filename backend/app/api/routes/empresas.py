@@ -132,7 +132,8 @@ async def crear_empresa(
             'representante_legal': representante_principal.nombre,
             'dni_representante': representante_principal.numero_documento,
             'estado': 'ACTIVO',
-            'tipo_empresa': 'SAC'
+            'tipo_empresa': 'SAC',
+            'categoria_contratista': empresa_data.categoria_contratista
         }
         
         empresa_id = empresa_service_neon.guardar_empresa(empresa_data_neon)
@@ -223,7 +224,8 @@ async def listar_empresas(
     page: int = Query(1, ge=1, description="Número de página"),
     per_page: int = Query(20, ge=1, le=100, description="Elementos por página"),
     search: Optional[str] = Query(None, description="Buscar por razón social, RUC o representante"),
-    estado: Optional[str] = Query(None, description="Filtrar por estado")
+    estado: Optional[str] = Query(None, description="Filtrar por estado"),
+    categoria: Optional[str] = Query(None, description="Filtrar por categoría: EJECUTORA o SUPERVISORA")
 ):
     """Listar empresas con filtros y paginación usando Neon PostgreSQL"""
     try:
@@ -247,6 +249,12 @@ async def listar_empresas(
         # Filtrar por estado si se especifica
         if estado:
             empresas_raw = [e for e in empresas_raw if e.get('estado', '').upper() == estado.upper()]
+        
+        # Filtrar por categoría si se especifica
+        if categoria:
+            categoria_upper = categoria.upper()
+            if categoria_upper in ['EJECUTORA', 'SUPERVISORA']:
+                empresas_raw = [e for e in empresas_raw if e.get('categoria_contratista', '').upper() == categoria_upper]
         
         # Aplicar paginación manual si fue búsqueda
         if search:
@@ -290,29 +298,39 @@ async def actualizar_empresa(
         detail="Actualización de empresas no implementada en la versión Turso"
     )
 
-@router.delete("/{empresa_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{empresa_id}")
 async def eliminar_empresa(
     empresa_id: str
 ):
     """Eliminar empresa usando el servicio Neon PostgreSQL (consistente con GET/LIST)"""
     try:
+        logger.info(f"🗑️ [ROUTER] Recibida petición DELETE para empresa: {empresa_id}")
+        
         # FIJO: Usar el mismo servicio que usa GET/LIST (Neon PostgreSQL)
         from app.services.empresa_service_neon import empresa_service_neon
         
         resultado = empresa_service_neon.eliminar_empresa(empresa_id)
         
         if not resultado:
+            logger.warning(f"❌ [ROUTER] Empresa no encontrada: {empresa_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Empresa no encontrada: {empresa_id}"
             )
-            
-        return {"message": "Empresa eliminada correctamente"}
+        
+        logger.info(f"✅ [ROUTER] Empresa eliminada exitosamente: {empresa_id}")
+        return {
+            "success": True,
+            "message": "Empresa eliminada correctamente",
+            "empresa_id": empresa_id
+        }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error eliminando empresa {empresa_id}: {e}")
+        logger.error(f"❌ [ROUTER] Error eliminando empresa {empresa_id}: {e}")
+        import traceback
+        logger.error(f"❌ [ROUTER] Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor al eliminar empresa"
@@ -402,6 +420,117 @@ async def validar_ruc_endpoint(
         
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno del servidor: {str(e)}"
+        )
+
+# Endpoints para filtrado por categoría
+@router.get("/ejecutoras", response_model=Dict[str, Any])
+async def listar_empresas_ejecutoras(
+    page: int = Query(1, ge=1, description="Número de página"),
+    per_page: int = Query(20, ge=1, le=100, description="Elementos por página"),
+    search: Optional[str] = Query(None, description="Buscar por razón social, RUC o representante")
+):
+    """Listar empresas ejecutoras únicamente"""
+    try:
+        # Calcular offset
+        offset = (page - 1) * per_page
+        
+        # Usar Neon PostgreSQL
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        empresas_raw = empresa_service_neon.listar_empresas(limit=per_page * 5)
+        
+        # Filtrar por categoría EJECUTORA
+        empresas_raw = [emp for emp in empresas_raw if emp.get('categoria_contratista') == 'EJECUTORA']
+        
+        # Filtrar por búsqueda si se especifica
+        if search:
+            search_lower = search.lower()
+            empresas_raw = [
+                emp for emp in empresas_raw 
+                if (search_lower in emp.get('razon_social', '').lower() or 
+                    search_lower in emp.get('ruc', ''))
+            ]
+        
+        # Aplicar paginación manual
+        total = len(empresas_raw)
+        empresas_raw = empresas_raw[offset:offset + per_page]
+        
+        # Convertir a formato de respuesta
+        empresas = [convertir_empresa_dict_a_response(emp) for emp in empresas_raw]
+        
+        resultado = {
+            "empresas": empresas,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page
+        }
+        
+        return {
+            "success": True,
+            "data": resultado,
+            "message": f"Se encontraron {total} empresa(s) ejecutoras"
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno del servidor: {str(e)}"
+        )
+
+@router.get("/supervisoras", response_model=Dict[str, Any])
+async def listar_empresas_supervisoras(
+    page: int = Query(1, ge=1, description="Número de página"),
+    per_page: int = Query(20, ge=1, le=100, description="Elementos por página"),
+    search: Optional[str] = Query(None, description="Buscar por razón social, RUC o representante")
+):
+    """Listar empresas supervisoras únicamente"""
+    try:
+        # Calcular offset
+        offset = (page - 1) * per_page
+        
+        # Usar Neon PostgreSQL
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        empresas_raw = empresa_service_neon.listar_empresas(limit=per_page * 5)
+        
+        # Filtrar por categoría SUPERVISORA
+        empresas_raw = [emp for emp in empresas_raw if emp.get('categoria_contratista') == 'SUPERVISORA']
+        
+        # Filtrar por búsqueda si se especifica
+        if search:
+            search_lower = search.lower()
+            empresas_raw = [
+                emp for emp in empresas_raw 
+                if (search_lower in emp.get('razon_social', '').lower() or 
+                    search_lower in emp.get('ruc', ''))
+            ]
+        
+        # Aplicar paginación manual
+        total = len(empresas_raw)
+        empresas_raw = empresas_raw[offset:offset + per_page]
+        
+        # Convertir a formato de respuesta
+        empresas = [convertir_empresa_dict_a_response(emp) for emp in empresas_raw]
+        
+        resultado = {
+            "empresas": empresas,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page
+        }
+        
+        return {
+            "success": True,
+            "data": resultado,
+            "message": f"Se encontraron {total} empresa(s) supervisoras"
+        }
+        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -128,6 +128,9 @@ class EmpresaCreateSchema(BaseModel):
     # Estados
     estado: str = Field("ACTIVO", description="Estado de la empresa")
     
+    # Categorización
+    categoria_contratista: Optional[str] = Field(None, description="Categoría del contratista: EJECUTORA o SUPERVISORA")
+    
     # Datos consolidados (solo lectura)
     especialidades_oece: Optional[List[str]] = Field([], description="Especialidades OECE")
     estado_sunat: Optional[str] = Field(None, description="Estado en SUNAT")
