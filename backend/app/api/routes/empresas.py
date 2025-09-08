@@ -269,13 +269,30 @@ async def actualizar_empresa(
 
 @router.delete("/{empresa_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def eliminar_empresa(
-    empresa_id: int
+    empresa_id: str
 ):
-    """Eliminar empresa (No implementado en Turso)"""
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Eliminación de empresas no implementada en la versión Turso"
-    )
+    """Eliminar empresa desde Neon PostgreSQL"""
+    try:
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        resultado = empresa_service_neon.eliminar_empresa(empresa_id)
+        
+        if not resultado:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Empresa no encontrada: {empresa_id}"
+            )
+            
+        return {"message": "Empresa eliminada correctamente"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error eliminando empresa {empresa_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error interno del servidor al eliminar empresa"
+        )
 
 @router.get("/{empresa_id}/representantes", response_model=Dict[str, Any])
 async def obtener_representantes_empresa(

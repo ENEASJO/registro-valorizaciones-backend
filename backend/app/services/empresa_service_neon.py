@@ -193,6 +193,36 @@ class EmpresaServiceNeon:
             logger.error(f"❌ Error obteniendo empresa por RUC {ruc}: {e}")
             return None
     
+    def eliminar_empresa(self, empresa_id: str) -> bool:
+        """
+        Eliminar empresa de Neon PostgreSQL
+        """
+        try:
+            with self._get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # Intentar eliminar por ID (UUID)
+                    query = "DELETE FROM empresas WHERE id = %s;"
+                    cursor.execute(query, (empresa_id,))
+                    
+                    # Si no se eliminó ninguna fila, intentar por RUC
+                    if cursor.rowcount == 0:
+                        query = "DELETE FROM empresas WHERE ruc = %s;"
+                        cursor.execute(query, (empresa_id,))
+                    
+                    rows_deleted = cursor.rowcount
+                    conn.commit()
+                    
+                    if rows_deleted > 0:
+                        logger.info(f"✅ Empresa eliminada - ID/RUC: {empresa_id}, filas: {rows_deleted}")
+                        return True
+                    else:
+                        logger.warning(f"⚠️ No se encontró empresa para eliminar: {empresa_id}")
+                        return False
+                        
+        except Exception as e:
+            logger.error(f"❌ Error eliminando empresa {empresa_id}: {e}")
+            return False
+    
     def get_stats(self) -> Dict[str, Any]:
         """Obtener estadísticas básicas"""
         try:
