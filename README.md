@@ -1,19 +1,71 @@
-# Sistema de Registro de Valorizaciones - Monorepo
+# 📊 Sistema de Registro de Valorizaciones
+<!-- Force Vercel deployment -->
 
-Sistema completo para el registro y gestión de valorizaciones de obras, con consulta automática de datos SUNAT/OSCE.
+Sistema integral para gestión de empresas, obras y valorizaciones con extracción automatizada de datos desde SUNAT y OSCE.
 
-## 📁 Estructura del Monorepo
+## 🚀 Características Principales
+
+- **🏢 Gestión de Empresas**: Registro completo con datos de SUNAT y OSCE
+- **🏗️ Control de Obras**: Seguimiento de proyectos y contratos
+- **💰 Valorizaciones**: Registro mensual de avances de obra
+- **🤖 Extracción Automatizada**: Web scraping de SUNAT y OSCE con Playwright
+- **⚡ Optimizaciones TURBO**: Extracción OSCE en 3-8 segundos
+- **🔄 Migración a Supabase**: Base de datos PostgreSQL escalable
+
+## 🏗️ Arquitectura
 
 ```
-├── frontend/              # Frontend (React + TypeScript + Vite)
-│   ├── src/              # Código fuente React
-│   ├── package.json      # Dependencias frontend
-│   └── vite.config.ts    # Configuración Vite
-├── backend/              # Backend (FastAPI + Python)
-│   ├── main.py          # API principal
-│   ├── requirements.txt  # Dependencias Python
-│   └── services/        # Servicios SUNAT/OSCE
-└── README.md            # Este archivo
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   FRONTEND      │    │    BACKEND      │    │   DATABASE      │
+│   (Vercel)      │◄──►│  (Cloud Run)    │◄──►│   (Supabase)    │
+│                 │    │                 │    │                 │
+│ - React 18      │    │ - FastAPI       │    │ - PostgreSQL    │
+│ - TypeScript    │    │ - Python 3.11   │    │ - Row Level     │
+│ - Vite          │    │ - Playwright    │    │   Security      │
+│ - Tailwind CSS  │    │ - Async/Await   │    │ - Real-time     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+
+                              │
+                    ┌─────────┼─────────┐
+                    │                   │
+          ┌─────────▼─────────┐ ┌───────▼───────┐
+          │      SUNAT        │ │     OSCE      │
+          │  Web Scraping     │ │ Web Scraping  │
+          │                   │ │  (Optimized)  │
+          └───────────────────┘ └───────────────┘
+```
+
+## 📁 Estructura del Proyecto
+
+```
+registro-valorizaciones/
+├── 📂 backend/
+│   ├── 📂 app/
+│   │   ├── 📂 api/routes/          # Rutas de API
+│   │   ├── 📂 services/            # Lógica de negocio
+│   │   │   ├── empresa_service_supabase.py
+│   │   │   ├── osce_turbo_service.py
+│   │   │   └── precache_service.py
+│   │   └── 📂 utils/               # Utilidades
+│   ├── 📄 main.py                  # Aplicación FastAPI
+│   ├── 📄 requirements.txt         # Dependencias Python
+│   └── 📄 Dockerfile              # Imagen Docker
+├── 📂 frontend/
+│   ├── 📂 src/
+│   │   ├── 📂 components/          # Componentes React
+│   │   ├── 📂 modules/             # Módulos por funcionalidad
+│   │   ├── 📂 config/              # Configuración
+│   │   └── 📄 main.tsx            # Punto de entrada
+│   ├── 📄 package.json            # Dependencias Node.js
+│   ├── 📄 vite.config.ts          # Configuración Vite
+│   └── 📄 vercel.json            # Configuración Vercel
+├── 📂 database/
+│   └── 📄 schema.sql              # Esquema Supabase
+├── 📂 scripts/
+│   └── 📄 setup-supabase.py       # Scripts de configuración
+├── 📄 .mcp.json                   # Configuración MCP Supabase
+├── 📄 cloudbuild.yaml            # CI/CD Google Cloud
+└── 📄 README.md                   # Este archivo
 ```
 
 ## 🏛️ Descripción del Proyecto
