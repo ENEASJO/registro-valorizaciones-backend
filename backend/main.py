@@ -929,6 +929,39 @@ async def crear_empresa_temporal(empresa: EmpresaCreate):
         "timestamp": datetime.now().isoformat()
     }
 
+# ENDPOINT TEMPORAL DE DELETE PARA DEBUGGING
+@app.delete("/api/empresas/{empresa_id}")
+async def eliminar_empresa_temporal(empresa_id: str):
+    """Endpoint temporal DELETE para debugging - usa Neon PostgreSQL"""
+    try:
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        print(f"🗑️ [TEMP DELETE] Eliminando empresa: {empresa_id}")
+        
+        resultado = empresa_service_neon.eliminar_empresa(empresa_id)
+        
+        if not resultado:
+            print(f"❌ [TEMP DELETE] Empresa {empresa_id} no encontrada en Neon")
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"Empresa no encontrada: {empresa_id}"}
+            )
+        
+        print(f"✅ [TEMP DELETE] Empresa {empresa_id} eliminada exitosamente")
+        return {
+            "success": True,
+            "message": "Empresa eliminada correctamente",
+            "empresa_id": empresa_id,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ [TEMP DELETE] Error eliminando empresa {empresa_id}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Error interno: {str(e)}"}
+        )
+
 # ENDPOINTS DE PRUEBA SUPABASE
 @app.post("/api/supabase/empresas")
 async def crear_empresa_supabase(data: dict):
