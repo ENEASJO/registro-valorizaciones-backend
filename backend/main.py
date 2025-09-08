@@ -753,6 +753,43 @@ async def crear_valorizacion(data: dict):
         "timestamp": datetime.now().isoformat()
     }
 
+@app.get("/api/empresas")
+async def listar_empresas_directo():
+    # GET directo para /api/empresas - usa Neon PostgreSQL
+    try:
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        empresas = empresa_service_neon.listar_empresas(limit=50)
+        
+        print(f"✅ [GET DIRECTO] Encontradas {len(empresas)} empresas en Neon")
+        return {
+            "success": True,
+            "data": {
+                "empresas": empresas,
+                "total": len(empresas),
+                "page": 1,
+                "per_page": 50,
+                "total_pages": 1
+            },
+            "message": f"Se encontraron {len(empresas)} empresa(s)",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ [GET DIRECTO] Error listando empresas: {e}")
+        return {
+            "success": False,
+            "data": {
+                "empresas": [],
+                "total": 0,
+                "page": 1,
+                "per_page": 50,
+                "total_pages": 0
+            },
+            "message": f"Error obteniendo empresas: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
 @app.delete("/api/empresas/{empresa_id}")
 async def eliminar_empresa_directo(empresa_id: str):
     # Docstring convertido a comentario
