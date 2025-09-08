@@ -738,6 +738,31 @@ async def crear_valorizacion(data: dict):
         "timestamp": datetime.now().isoformat()
     }
 
+@app.delete("/api/empresas/{empresa_id}")
+async def eliminar_empresa_directo(empresa_id: str):
+    """Eliminar empresa - ENDPOINT DIRECTO (solución temporal para 404)"""
+    try:
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        resultado = empresa_service_neon.eliminar_empresa(empresa_id)
+        
+        if not resultado:
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Empresa no encontrada: {empresa_id}"
+            )
+            
+        return {"message": "Empresa eliminada correctamente"}
+        
+    except Exception as e:
+        print(f"❌ Error eliminando empresa {empresa_id}: {e}")
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error interno del servidor al eliminar empresa"
+        )
+
 @app.get("/api/empresas-guardadas")
 async def empresas_guardadas():
     return {
