@@ -119,11 +119,23 @@ async def crear_empresa(
             }
         }
         
-        # Crear empresa en Turso
-        empresa_id = empresa_service.save_empresa_from_consulta(
-            ruc=empresa_data.ruc,
-            datos_consulta=datos_empresa
-        )
+        # CAMBIO: Crear empresa en Neon PostgreSQL
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        # Preparar datos para Neon
+        empresa_data_neon = {
+            'ruc': empresa_data.ruc,
+            'razon_social': empresa_data.razon_social,
+            'email': empresa_data.email or '',
+            'telefono': empresa_data.celular or '',
+            'direccion': empresa_data.direccion or '',
+            'representante_legal': representante_principal.nombre,
+            'dni_representante': representante_principal.numero_documento,
+            'estado': 'ACTIVO',
+            'tipo_empresa': 'SAC'
+        }
+        
+        empresa_id = empresa_service_neon.guardar_empresa(empresa_data_neon)
         
         if not empresa_id:
             raise HTTPException(
@@ -132,7 +144,7 @@ async def crear_empresa(
             )
         
         # Obtener empresa creada para retornar
-        empresa_creada = empresa_service.get_empresa_by_ruc(empresa_data.ruc)
+        empresa_creada = empresa_service_neon.obtener_empresa_por_ruc(empresa_data.ruc)
         if not empresa_creada:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -213,16 +225,24 @@ async def listar_empresas(
     search: Optional[str] = Query(None, description="Buscar por razón social, RUC o representante"),
     estado: Optional[str] = Query(None, description="Filtrar por estado")
 ):
-    """Listar empresas con filtros y paginación usando Turso"""
+    """Listar empresas con filtros y paginación usando Neon PostgreSQL"""
     try:
         # Calcular offset
         offset = (page - 1) * per_page
         
-        # Si hay búsqueda, usar el método de búsqueda
+        # CAMBIO: Usar Neon en lugar de Turso
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        empresas_raw = empresa_service_neon.listar_empresas(limit=per_page * 5)
+        
+        # Filtrar por búsqueda si se especifica
         if search:
-            empresas_raw = empresa_service.search_empresas(search, limit=per_page * 5)  # Más resultados para filtrar
-        else:
-            empresas_raw = empresa_service.list_empresas(limit=per_page * 5, offset=offset)
+            search_lower = search.lower()
+            empresas_raw = [
+                emp for emp in empresas_raw 
+                if (search_lower in emp.get('razon_social', '').lower() or 
+                    search_lower in emp.get('ruc', ''))
+            ]
         
         # Filtrar por estado si se especifica
         if estado:
