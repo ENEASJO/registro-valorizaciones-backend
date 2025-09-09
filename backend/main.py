@@ -970,6 +970,77 @@ async def crear_empresa_temporal(empresa: EmpresaCreate):
 
 # ELIMINADO: Endpoint DELETE temporal duplicado - usar solo el del router
 
+# ENDPOINT DE PRUEBA: Consolidación con representantes mejorada
+@app.post("/api/test/consolidacion-mejorada")
+async def test_consolidacion_mejorada(ruc_input: RUCInput):
+    """Endpoint de prueba para la consolidación mejorada con representantes"""
+    ruc = ruc_input.ruc.strip()
+    
+    print(f"🧪 TESTING: Consolidación mejorada para RUC: {ruc}")
+    
+    try:
+        from app.services.consolidation_service import consolidation_service
+        
+        # Probar la consolidación mejorada
+        resultado_consolidado = await consolidation_service.consultar_consolidado(ruc)
+        
+        # Convertir a diccionario para respuesta
+        return {
+            "success": True,
+            "data": {
+                "ruc": resultado_consolidado.ruc,
+                "razon_social": resultado_consolidado.razon_social,
+                "estado": resultado_consolidado.registro.estado_sunat if resultado_consolidado.registro else "No disponible",
+                "fuentes_consultadas": resultado_consolidado.fuentes_consultadas,
+                "fuentes_con_errores": resultado_consolidado.fuentes_con_errores,
+                "consolidacion_exitosa": resultado_consolidado.consolidacion_exitosa,
+                "total_miembros": len(resultado_consolidado.miembros),
+                "miembros_detalle": [
+                    {
+                        "nombre": miembro.nombre,
+                        "cargo": miembro.cargo,
+                        "documento": miembro.numero_documento,
+                        "tipo_documento": miembro.tipo_documento,
+                        "fuente": miembro.fuente,
+                        "participacion": miembro.participacion,
+                        "fecha_desde": miembro.fecha_desde,
+                        "detalles_matching": miembro.fuentes_detalle if hasattr(miembro, 'fuentes_detalle') else None
+                    } for miembro in resultado_consolidado.miembros
+                ],
+                "contacto": {
+                    "domicilio_fiscal": resultado_consolidado.contacto.domicilio_fiscal if resultado_consolidado.contacto else "",
+                    "telefono": resultado_consolidado.contacto.telefono if resultado_consolidado.contacto else "",
+                    "email": resultado_consolidado.contacto.email if resultado_consolidado.contacto else "",
+                    "direccion": resultado_consolidado.contacto.direccion if resultado_consolidado.contacto else "",
+                    "ciudad": resultado_consolidado.contacto.ciudad if resultado_consolidado.contacto else "",
+                    "departamento": resultado_consolidado.contacto.departamento if resultado_consolidado.contacto else ""
+                },
+                "especialidades": resultado_consolidado.especialidades,
+                "capacidad_contratacion": resultado_consolidado.capacidad_contratacion,
+                "vigencia": resultado_consolidado.vigencia,
+                "observaciones": resultado_consolidado.observaciones
+            },
+            "mensaje": f"Consolidación completada exitosamente - {len(resultado_consolidado.miembros)} miembros únicos",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except ImportError as e:
+        print(f"⚠️ Error importando servicio de consolidación: {e}")
+        return {
+            "success": False,
+            "error": "Servicio de consolidación no disponible",
+            "message": f"ImportError: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        print(f"❌ Error en consolidación mejorada: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Error en consolidación: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
 # # ENDPOINTS DE PRUEBA SUPABASE - DESHABILITADOS
 #     # Crear empresa en Supabase (prueba)
 #     print(f"📝 [SUPABASE] Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")

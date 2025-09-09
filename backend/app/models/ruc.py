@@ -134,6 +134,12 @@ class EmpresaInfo(BaseModel):
         description="Domicilio fiscal registrado en SUNAT",
         example="AV. EXAMPLE 123, DISTRICT - PROVINCE - DEPARTMENT"
     )
+    estado: Optional[str] = Field(
+        default="ACTIVO",
+        title="Estado",
+        description="Estado de la empresa en SUNAT",
+        example="ACTIVO"
+    )
     representantes: List[RepresentanteLegal] = Field(
         default_factory=list,
         title="Representantes Legales",

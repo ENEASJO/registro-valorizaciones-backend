@@ -18,10 +18,7 @@ from app.models.consolidated import (
 )
 from app.models.ruc import EmpresaInfo, RepresentanteLegal
 from app.models.osce import EmpresaOSCE, IntegranteOSCE
-# Import the working SUNAT function from main.py
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+# Servicios dedicados para SUNAT y OSCE
 from app.services.osce_service import OSCEService
 from app.utils.exceptions import ValidationException, ExtractionException
 
@@ -109,37 +106,17 @@ class ConsolidationService:
         return empresa_consolidada
     
     async def _consultar_sunat_safe(self, ruc: str) -> Optional[EmpresaInfo]:
-        """Consultar SUNAT con manejo seguro de errores usando la función funcional de main.py"""
+        """Consultar SUNAT con manejo seguro de errores usando el servicio dedicado SUNAT"""
         try:
-            # Import the working SUNAT function from main.py
-            from main import consultar_ruc_sunat, RUCInput
+            # Usar el servicio dedicado SUNAT que extrae representantes legales
+            from app.services.sunat_service import sunat_service
             
-            # Call the working function directly
-            ruc_input = RUCInput(ruc=ruc)
-            response = await consultar_ruc_sunat(ruc_input)
+            # Consultar empresa completa con representantes
+            empresa_info = await sunat_service.consultar_empresa_completa(ruc)
             
-            # Extract data from response
-            if "success" in response and response["success"] and "data" in response:
-                data = response["data"]
-            else:
-                raise Exception(response.get("message", "Error en consulta SUNAT"))
+            logger.info(f"✅ SUNAT: Datos completos obtenidos exitosamente para RUC {ruc}")
+            logger.info(f"   📋 {len(empresa_info.representantes)} representantes extraídos")
             
-            if "error" in data and data["error"]:
-                raise Exception(data.get("message", "Error en consulta SUNAT"))
-            
-            # Crear lista de representantes (main.py no devuelve representantes, solo datos básicos)
-            representantes = []
-            # Note: main.py's consultar_ruc_sunat doesn't return representantes, only basic company info
-            
-            # Crear objeto EmpresaInfo
-            empresa_info = EmpresaInfo(
-                ruc=data.get("ruc", ruc),
-                razon_social=data.get("razon_social", ""),
-                domicilio_fiscal=data.get("direccion", ""),  # main.py uses "direccion" field
-                representantes=representantes
-            )
-            
-            logger.info(f"✅ SUNAT: Datos obtenidos exitosamente para RUC {ruc}")
             return empresa_info
             
         except Exception as e:

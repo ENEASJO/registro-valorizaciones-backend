@@ -1,507 +1,440 @@
 """
-Servicio para consultar información de empresas en SUNAT
+Servicio dedicado para consultas SUNAT con extracción de representantes legales
 """
-import asyncio
-from typing import List, Optional, Dict, Any
-from playwright.async_api import async_playwright, Browser, Page, TimeoutError as PlaywrightTimeoutError
 import logging
+import re
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
 from app.models.ruc import EmpresaInfo, RepresentanteLegal
-from app.core.config import settings
-from app.utils.validators import validate_ruc
+from app.utils.exceptions import ValidationException, ExtractionException
 from app.utils.playwright_helper import get_browser_launch_options
 
 logger = logging.getLogger(__name__)
 
 
 class SUNATService:
-    """Servicio para consultar información de empresas en SUNAT"""
+    """Servicio para consultar datos completos de empresas en SUNAT incluyendo representantes legales"""
     
     def __init__(self):
         self.base_url = "https://e-consultaruc.sunat.gob.pe/cl-ti-itmrconsruc/FrameCriterioBusquedaWeb.jsp"
-        self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        self.timeout = 60000  # 60 segundos
-        self.search_timeout = 10000  # 10 segundos
+        self.timeout = 30000
         
-    async def consultar_empresa(self, ruc: str) -> EmpresaInfo:
+    async def consultar_empresa_completa(self, ruc: str) -> EmpresaInfo:
         """
-        Consultar información completa de una empresa por RUC
+        Consulta información completa de una empresa en SUNAT incluyendo representantes
         
         Args:
-            ruc: RUC de la empresa a consultar
+            ruc: RUC de 11 dígitos
             
         Returns:
-            EmpresaInfo: Información completa de la empresa
+            EmpresaInfo: Información completa de la empresa con representantes
             
         Raises:
-            ValueError: Si el RUC no es válido
-            Exception: Si hay errores en la consulta
+            ValidationException: Si el RUC no es válido
+            ExtractionException: Si hay errores en la extracción
         """
-        # Validar RUC
-        if not validate_ruc(ruc):
-            raise ValueError(f"RUC inválido: {ruc}")
+        logger.info(f"=== INICIANDO CONSULTA SUNAT COMPLETA PARA RUC: {ruc} ===")
         
-        logger.info(f"🔍 Consultando RUC: {ruc}")
+        # Validar RUC
+        if not self._validar_ruc(ruc):
+            raise ValidationException(f"RUC inválido: {ruc}")
         
         async with async_playwright() as p:
-            launch_options = get_browser_launch_options(headless=settings.HEADLESS_BROWSER)
-            browser = await p.chromium.launch(**launch_options)
-            
             try:
-                logger.info(f"🌐 Creando contexto de navegador...")
-                context = await browser.new_context(
-                    viewport={'width': 1280, 'height': 720},
-                    user_agent=self.user_agent
+                launch_options = get_browser_launch_options(headless=True)
+                browser = await p.chromium.launch(**launch_options)
+                
+                page = await browser.new_page(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36"
                 )
-                logger.info(f"✅ Contexto creado exitosamente")
                 
-                logger.info(f"📄 Creando nueva página...")
-                page = await context.new_page()
-                if not page:
-                    raise Exception("No se pudo crear la página del navegador")
-                logger.info(f"✅ Página creada exitosamente")
+                logger.info("Navegando a SUNAT...")
+                await page.goto(self.base_url, timeout=self.timeout)
                 
-                logger.info(f"⏱️ Configurando timeout ({self.timeout}ms)...")
-                page.set_default_timeout(self.timeout)
-                logger.info(f"✅ Timeout configurado")
+                # Llenar formulario de búsqueda
+                await page.fill("#txtRuc", ruc)
+                await page.wait_for_timeout(1000)
                 
-                # Navegar a la página principal y hacer búsqueda
-                logger.info(f"🌐 Navegando a SUNAT...")
-                await page.goto(self.base_url, timeout=self.timeout, wait_until='domcontentloaded')
-                await page.wait_for_timeout(3000)
+                # Verificar si hay captcha
+                captcha_required = await self._verificar_captcha(page)
+                if captcha_required:
+                    logger.warning("SUNAT requiere CAPTCHA - extracción limitada")
                 
-                logger.info(f"🔍 Realizando búsqueda para RUC: {ruc}")
-                await page.fill('#txtRuc', ruc)
-                await page.click('#btnAceptar')
-                await page.wait_for_timeout(5000)  # Aumentar espera para que cargue completamente
-                logger.info(f"✅ Búsqueda completada")
+                # Submit
+                await page.click("#btnAceptar")
+                await page.wait_for_timeout(5000)
                 
-                # Obtener información básica
-                razon_social = await self._obtener_razon_social(page, ruc)
+                # Extraer datos básicos
+                datos_basicos = await self._extraer_datos_basicos(page, ruc)
                 
-                # Obtener domicilio fiscal
-                domicilio_fiscal = await self._obtener_domicilio_fiscal(page, ruc)
+                # Extraer representantes legales
+                representantes = await self._extraer_representantes(page, ruc)
                 
-                # Obtener representantes legales
-                representantes = await self._obtener_representantes_legales(page)
-                
-                resultado = EmpresaInfo(
+                empresa_info = EmpresaInfo(
                     ruc=ruc,
-                    razon_social=razon_social,
-                    domicilio_fiscal=domicilio_fiscal,
-                    representantes=representantes
+                    razon_social=datos_basicos.get("razon_social", ""),
+                    domicilio_fiscal=datos_basicos.get("direccion", ""),
+                    estado=datos_basicos.get("estado", "ACTIVO"),
+                    representantes=representantes,
+                    total_representantes=len(representantes)
                 )
                 
-                logger.info(f"📊 Consulta exitosa para RUC {ruc}: {len(representantes)} representantes encontrados")
-                return resultado
-                
-            except PlaywrightTimeoutError as e:
-                logger.error(f"❌ Timeout en consulta SUNAT para RUC {ruc}: {str(e)}")
-                raise Exception(f"Timeout al consultar SUNAT: {str(e)}")
+                logger.info(f"✅ Consulta SUNAT completada: {len(representantes)} representantes encontrados")
+                await browser.close()
+                return empresa_info
                 
             except Exception as e:
-                logger.error(f"❌ Error consultando RUC {ruc}: {str(e)}")
-                # Tomar screenshot para debug si hay error
-                if settings.DEBUG:
-                    try:
-                        await page.screenshot(path=f"error_sunat_{ruc}.png")
-                    except:
-                        pass
-                raise Exception(f"Error al consultar SUNAT: {str(e)}")
-                
-            finally:
-                await browser.close()
+                logger.error(f"Error en consulta SUNAT: {str(e)}")
+                if 'browser' in locals():
+                    await browser.close()
+                raise ExtractionException(f"Error consultando SUNAT: {str(e)}")
     
-    async def _obtener_razon_social(self, page: Page, ruc: str) -> str:
-        """
-        Obtener la razón social de la empresa desde la página ya cargada
+    async def _verificar_captcha(self, page) -> bool:
+        """Verificar si se requiere CAPTCHA"""
+        captcha_selectors = ["#txtCodigo", "#txtCaptcha", "input[name*='captcha']", "input[name*='codigo']"]
         
-        Args:
-            page: Página de Playwright ya navegada
-            ruc: RUC a consultar
-            
-        Returns:
-            str: Razón social de la empresa
-        """
-        try:
-            logger.info(f"🔍 Buscando razón social en la página actual...")
-            
-            # Esperar a que la página cargue completamente
-            await page.wait_for_load_state('domcontentloaded')
-            await page.wait_for_timeout(2000)
-            
-            # Debug: mostrar parte del contenido de la página
-            texto_pagina = await page.inner_text('body')
-            print(f"🔍 DEBUG SUNAT: Primeros 800 chars: {texto_pagina[:800]}")
-            
-            # Intentar múltiples selectores para razón social
-            selectores_razon_social = [
-                "td.bgn:has-text('Nombre o Razón Social:') + td",
-                "td:has-text('Nombre o Razón Social:') + td", 
-                "td.bgn:has-text('Razón Social:') + td",
-                "td:has-text('Razón Social:') + td",
-                "span:has-text('Nombre o Razón Social:') ~ span",
-                "div:has-text('Nombre o Razón Social:') ~ div"
-            ]
-            
-            for selector in selectores_razon_social:
-                try:
-                    razon_social_elem = await page.wait_for_selector(selector, timeout=self.search_timeout)
-                    if razon_social_elem:
-                        razon_social = (await razon_social_elem.inner_text()).strip()
-                        if razon_social and len(razon_social) > 5:  # Filtrar respuestas muy cortas
-                            logger.info(f"📝 Razón Social encontrada con selector {selector}: {razon_social}")
-                            return razon_social
-                except PlaywrightTimeoutError:
-                    continue
-                except Exception:
-                    continue
-            
-            # Método alternativo: buscar en todo el texto de la página
-            logger.info("🔍 Método alternativo: buscando en texto completo...")
-            texto_completo = await page.inner_text('body')
-            lineas = texto_completo.split('\n')
-            
-            # Método específico para SUNAT: buscar línea con RUC - RAZÓN SOCIAL
-            for linea in lineas:
-                if ruc in linea and ' - ' in linea:
-                    partes = linea.split(' - ', 1)
-                    if len(partes) > 1:
-                        razon_social = partes[1].strip()
-                        if razon_social and len(razon_social) > 5:
-                            logger.info(f"📝 Razón Social encontrada en formato RUC - NOMBRE: {razon_social}")
-                            return razon_social
-            
-            # Método general: buscar por etiquetas
-            for i, linea in enumerate(lineas):
-                if 'Nombre o Razón Social:' in linea or 'Razón Social:' in linea:
-                    # La razón social puede estar en la misma línea o en la siguiente
-                    if ':' in linea:
-                        razon_social = linea.split(':', 1)[1].strip()
-                        if razon_social and len(razon_social) > 5:
-                            logger.info(f"📝 Razón Social encontrada en línea: {razon_social}")
-                            return razon_social
-                    
-                    # Verificar línea siguiente
-                    if i + 1 < len(lineas):
-                        siguiente_linea = lineas[i + 1].strip()
-                        if siguiente_linea and len(siguiente_linea) > 5 and not siguiente_linea.startswith(('Nombre', 'RUC', 'Tipo')):
-                            logger.info(f"📝 Razón Social encontrada en línea siguiente: {siguiente_linea}")
-                            return siguiente_linea
-            
-            logger.warning(f"⚠️ No se encontró razón social para RUC {ruc}")
-            raise Exception(f"No se pudo extraer razón social para RUC {ruc}")
-            
-        except Exception as e:
-            logger.error(f"❌ Error obteniendo razón social: {str(e)}")
-            raise Exception(f"Error al obtener razón social: {str(e)}")
-    
-    async def _obtener_domicilio_fiscal(self, page: Page, ruc: str) -> str:
-        """
-        Obtener el domicilio fiscal de la empresa
-        
-        Args:
-            page: Página de Playwright
-            ruc: RUC a consultar
-            
-        Returns:
-            str: Domicilio fiscal de la empresa
-        """
-        try:
-            logger.info(f"🏠 Buscando domicilio fiscal para RUC: {ruc}")
-            
-            # Esperar a que la página cargue completamente
-            await page.wait_for_load_state('domcontentloaded')
-            await page.wait_for_timeout(1000)
-            
-            # Método 1: Buscar en todo el texto de la página
-            page_text = await page.inner_text('body')
-            lines = page_text.split('\n')
-            
-            for i, line in enumerate(lines):
-                line = line.strip()
-                if "Domicilio Fiscal:" in line or "DOMICILIO FISCAL:" in line.upper():
-                    logger.info(f"✅ Encontrada línea con domicilio fiscal: {line}")
-                    
-                    # Si el domicilio está en la misma línea
-                    if ":" in line:
-                        parts = line.split(":", 1)
-                        if len(parts) > 1 and parts[1].strip():
-                            domicilio = parts[1].strip()
-                            if len(domicilio) > 2 and domicilio != "-":
-                                logger.info(f"🏠 Domicilio fiscal extraído (misma línea): {domicilio}")
-                                return domicilio
-                    
-                    # Verificar líneas siguientes para el domicilio
-                    if i + 1 < len(lines):
-                        siguiente_linea = lines[i + 1].strip()
-                        
-                        if siguiente_linea == "-":
-                            logger.info(f"🏠 Domicilio fiscal no registrado (guión encontrado)")
-                            return "No registrado"
-                        elif siguiente_linea and len(siguiente_linea) > 10:
-                            # Verificar que no sea parte del menú o navegación
-                            if not any(nav in siguiente_linea.lower() for nav in ['volver', 'imprimir', 'email', 'consulta', 'resultado']):
-                                logger.info(f"🏠 Domicilio fiscal extraído (línea siguiente): {siguiente_linea}")
-                                return siguiente_linea
-                        elif i + 2 < len(lines):
-                            # Buscar en la línea que está después de una posible línea vacía
-                            linea_dos_despues = lines[i + 2].strip()
-                            
-                            if linea_dos_despues == "-":
-                                logger.info(f"🏠 Domicilio fiscal no registrado (guión encontrado)")
-                                return "No registrado"
-                            elif linea_dos_despues and len(linea_dos_despues) > 10:
-                                # Verificar que no sea parte del menú o navegación
-                                if not any(nav in linea_dos_despues.lower() for nav in ['volver', 'imprimir', 'email', 'consulta', 'resultado']):
-                                    logger.info(f"🏠 Domicilio fiscal extraído (dos líneas después): {linea_dos_despues}")
-                                    return linea_dos_despues
-            
-            # Método 2: Buscar con selectores CSS específicos
-            logger.info("⚠️ Método de texto falló, buscando con selectores CSS...")
-            
-            # Selector para tabla con "Domicilio Fiscal"
+        for selector in captcha_selectors:
             try:
-                domicilio_elem = await page.wait_for_selector("td.bgn:has-text('Domicilio Fiscal:') + td", timeout=self.search_timeout)
-                if domicilio_elem:
-                    domicilio = (await domicilio_elem.inner_text()).strip()
-                    if domicilio and len(domicilio) > 10:
-                        logger.info(f"🏠 Domicilio fiscal extraído con CSS específico: {domicilio}")
-                        return domicilio
-            except PlaywrightTimeoutError:
-                pass
-            
-            logger.warning(f"⚠️ No se pudo extraer domicilio fiscal para RUC: {ruc}")
-            return "No disponible"
-            
-        except Exception as e:
-            logger.error(f"❌ Error al extraer domicilio fiscal: {str(e)}")
-            return "No disponible"
-    
-    async def _obtener_representantes_legales(self, page: Page) -> List[RepresentanteLegal]:
-        """
-        Obtener la lista de representantes legales
-        
-        Args:
-            page: Página de Playwright
-            
-        Returns:
-            List[RepresentanteLegal]: Lista de representantes legales
-        """
-        representantes = []
-        
-        try:
-            logger.info("⏳ Buscando botón 'Representante(s) Legal(es)'...")
-            
-            # Intentar hacer clic en el botón de representantes
-            boton_encontrado = await self._clickear_boton_representantes(page)
-            
-            if not boton_encontrado:
-                logger.warning("⚠️ No se encontró el botón de Representantes Legales")
-                return representantes
-            
-            # Esperar a que se cargue la información
-            await page.wait_for_timeout(3000)
-            logger.info("📋 Extrayendo tabla de Representantes Legales...")
-            
-            # Extraer datos de las tablas
-            representantes = await self._extraer_datos_tablas(page)
-            
-            logger.info(f"📊 Total de representantes extraídos: {len(representantes)}")
-            return representantes
-            
-        except Exception as e:
-            logger.error(f"⚠️ Error al extraer representantes: {str(e)}")
-            return representantes
-    
-    async def _clickear_boton_representantes(self, page: Page) -> bool:
-        """
-        Intentar hacer clic en el botón de representantes legales
-        
-        Args:
-            page: Página de Playwright
-            
-        Returns:
-            bool: True si se hizo clic exitosamente
-        """
-        # Método 1: Buscar por texto exacto
-        try:
-            await page.click("text='Representante(s) Legal(es)'", timeout=self.search_timeout)
-            logger.info("✅ Botón clickeado por texto")
-            return True
-        except PlaywrightTimeoutError:
-            pass
-        except Exception:
-            pass
-        
-        # Método 2: Buscar por input value
-        try:
-            boton = await page.wait_for_selector("input[type='button'][value*='Representante']", timeout=self.search_timeout)
-            if boton:
-                await boton.click()
-                logger.info("✅ Botón clickeado por input value")
-                return True
-        except PlaywrightTimeoutError:
-            pass
-        except Exception:
-            pass
-        
-        # Método 3: Buscar enlaces
-        try:
-            link = await page.wait_for_selector("a:has-text('Representante')", timeout=self.search_timeout)
-            if link:
-                await link.click()
-                logger.info("✅ Enlace de representantes clickeado")
-                return True
-        except PlaywrightTimeoutError:
-            pass
-        except Exception:
-            pass
-        
+                if await page.is_visible(selector, timeout=1000):
+                    return True
+            except:
+                continue
         return False
     
-    async def _extraer_datos_tablas(self, page: Page) -> List[RepresentanteLegal]:
-        """
-        Extraer datos de representantes de todas las tablas
+    async def _extraer_datos_basicos(self, page, ruc: str) -> Dict[str, str]:
+        """Extraer datos básicos de la empresa"""
+        logger.info("Extrayendo datos básicos...")
         
-        Args:
-            page: Página de Playwright
+        datos = {
+            "razon_social": "No disponible",
+            "estado": "ACTIVO", 
+            "direccion": "No disponible"
+        }
+        
+        try:
+            # Método 1: Buscar H4 con patrón RUC - NOMBRE
+            h4_elements = await page.query_selector_all('h4')
+            for h4 in h4_elements:
+                try:
+                    text = await h4.inner_text()
+                    text = text.strip()
+                    
+                    if " - " in text and text.startswith(ruc):
+                        parts = text.split(" - ", 1)
+                        if len(parts) >= 2 and len(parts[1].strip()) > 5:
+                            datos["razon_social"] = parts[1].strip()
+                            logger.info(f"✅ Razón social encontrada: {datos['razon_social']}")
+                            break
+                except:
+                    continue
             
-        Returns:
-            List[RepresentanteLegal]: Lista de representantes extraídos
-        """
+            # Extraer estado y dirección
+            paragraphs = await page.query_selector_all('p')
+            for p in paragraphs:
+                try:
+                    p_text = await p.inner_text()
+                    p_text = p_text.strip()
+                    
+                    # Buscar estado
+                    if datos["estado"] == "ACTIVO" and p_text in ["ACTIVO", "INACTIVO", "SUSPENDIDO"]:
+                        datos["estado"] = p_text
+                        logger.info(f"✅ Estado encontrado: {datos['estado']}")
+                    
+                    # Buscar dirección
+                    if datos["direccion"] == "No disponible" and p_text and len(p_text) > 20:
+                        if any(word in p_text.upper() for word in ["AV.", "JR.", "CALLE", "CAL.", "LIMA", "NRO.", "MZA", "LOTE", "INT."]):
+                            datos["direccion"] = p_text
+                            logger.info(f"✅ Dirección encontrada: {datos['direccion'][:50]}...")
+                except:
+                    continue
+        
+        except Exception as e:
+            logger.warning(f"Error extrayendo datos básicos: {e}")
+        
+        return datos
+    
+    async def _extraer_representantes(self, page, ruc: str) -> List[RepresentanteLegal]:
+        """Extraer representantes legales de la página de SUNAT"""
+        logger.info("Extrayendo representantes legales...")
+        
         representantes = []
         
         try:
-            # Buscar todas las tablas
+            # SUNAT muestra representantes en tablas o listas estructuradas
+            # Buscar sección de "Representantes Legales" o "Datos del Representante Legal"
+            
+            # Método 1: Buscar tablas que contengan datos de representantes
             tables = await page.query_selector_all('table')
+            logger.info(f"Encontradas {len(tables)} tablas para analizar")
             
-            for table_idx, table in enumerate(tables):
-                rows = await table.query_selector_all("tr")
-                
-                if len(rows) == 0:
-                    continue
-                
-                # Verificar si tiene estructura de tabla de personas
-                primera_fila_celdas = await rows[0].query_selector_all("td, th")
-                
-                if len(primera_fila_celdas) < 3:
-                    continue
-                
-                logger.info(f"   📊 Procesando tabla {table_idx + 1} con {len(rows)} filas...")
-                
-                # Procesar cada fila
-                for row_idx, row in enumerate(rows):
-                    celdas = await row.query_selector_all("td")
+            for i, table in enumerate(tables):
+                try:
+                    table_text = await table.inner_text()
                     
-                    if not celdas or len(celdas) < 3:
+                    # Verificar si la tabla contiene información de representantes
+                    if any(keyword in table_text.upper() for keyword in [
+                        "REPRESENTANTE", "GERENTE", "ADMINISTRADOR", "APODERADO", 
+                        "PRESIDENTE", "DIRECTOR", "DNI", "DOCUMENTO"
+                    ]):
+                        logger.info(f"Tabla {i} parece contener representantes")
+                        representantes_tabla = await self._extraer_de_tabla(table)
+                        representantes.extend(representantes_tabla)
+                        
+                except Exception as e:
+                    logger.warning(f"Error procesando tabla {i}: {e}")
+                    continue
+            
+            # Método 2: Buscar elementos div que contengan información estructurada
+            if not representantes:
+                divs = await page.query_selector_all('div')
+                for div in divs:
+                    try:
+                        div_text = await div.inner_text()
+                        if self._parece_info_representante(div_text):
+                            representante = await self._extraer_de_div(div)
+                            if representante:
+                                representantes.append(representante)
+                    except:
                         continue
-                    
-                    # Extraer texto de cada celda
-                    textos = []
-                    for celda in celdas:
-                        texto = (await celda.inner_text()).strip()
-                        textos.append(texto)
-                    
-                    # Validar y procesar fila
-                    representante = self._procesar_fila_representante(textos)
-                    
-                    if representante:
-                        representantes.append(representante)
-                        logger.info(f"   ✅ Persona {len(representantes)}: {representante.nombre} - {representante.cargo}")
             
-            return representantes
+            # Método 3: Análisis de texto completo si no se encontraron representantes
+            if not representantes:
+                logger.info("Analizando texto completo para encontrar representantes...")
+                page_text = await page.evaluate('() => document.body.innerText')
+                representantes = self._extraer_de_texto_completo(page_text)
+            
+            logger.info(f"✅ Encontrados {len(representantes)} representantes legales")
             
         except Exception as e:
-            logger.error(f"❌ Error extrayendo datos de tablas: {str(e)}")
-            return representantes
+            logger.error(f"Error extrayendo representantes: {e}")
+        
+        return representantes
     
-    def _procesar_fila_representante(self, textos: List[str]) -> Optional[RepresentanteLegal]:
-        """
-        Procesar una fila de datos y crear un RepresentanteLegal
-        
-        Args:
-            textos: Lista de textos de las celdas
-            
-        Returns:
-            Optional[RepresentanteLegal]: Representante creado o None si no es válido
-        """
-        # Filtrar filas vacías o de encabezado
-        if not any(texto and texto != "-" and len(texto) > 2 for texto in textos):
-            return None
-        
-        # Determinar el formato basado en número de columnas
-        persona_data = {}
-        
-        if len(textos) >= 5:
-            # Formato: TIPO DOC | NUM DOC | NOMBRE | CARGO | FECHA
-            persona_data = {
-                "tipo_doc": textos[0],
-                "numero_doc": textos[1],
-                "nombre": textos[2],
-                "cargo": textos[3],
-                "fecha_desde": textos[4] if len(textos) > 4 else ""
-            }
-        elif len(textos) == 4:
-            # Formato: NUM DOC | NOMBRE | CARGO | FECHA
-            persona_data = {
-                "tipo_doc": "DNI",
-                "numero_doc": textos[0],
-                "nombre": textos[1],
-                "cargo": textos[2],
-                "fecha_desde": textos[3]
-            }
-        elif len(textos) == 3:
-            # Formato: NOMBRE | CARGO | FECHA
-            persona_data = {
-                "tipo_doc": "-",
-                "numero_doc": "-",
-                "nombre": textos[0],
-                "cargo": textos[1],
-                "fecha_desde": textos[2]
-            }
-        else:
-            return None
-        
-        # Validar que el nombre no sea un header
-        nombre = persona_data.get("nombre", "")
-        if not self._es_nombre_valido(nombre):
-            return None
+    async def _extraer_de_tabla(self, table) -> List[RepresentanteLegal]:
+        """Extraer representantes de una tabla HTML"""
+        representantes = []
         
         try:
-            return RepresentanteLegal(**persona_data)
-        except Exception as e:
-            logger.warning(f"⚠️ Error creando representante: {str(e)} - Datos: {persona_data}")
-            return None
-    
-    def _es_nombre_valido(self, nombre: str) -> bool:
-        """
-        Validar que el nombre sea válido y no un header de tabla
-        
-        Args:
-            nombre: Nombre a validar
+            # Obtener filas de la tabla
+            rows = await table.query_selector_all('tr')
             
-        Returns:
-            bool: True si el nombre es válido
-        """
-        if not nombre or len(nombre) < 3:
-            return False
+            # Buscar encabezados para entender la estructura
+            headers = []
+            if rows:
+                first_row = rows[0]
+                header_cells = await first_row.query_selector_all('th, td')
+                for cell in header_cells:
+                    header_text = await cell.inner_text()
+                    headers.append(header_text.strip().upper())
+            
+            # Procesar filas de datos
+            for row in rows[1:]:  # Saltar header
+                try:
+                    cells = await row.query_selector_all('td')
+                    if len(cells) >= 2:  # Necesitamos al menos 2 celdas
+                        row_data = []
+                        for cell in cells:
+                            cell_text = await cell.inner_text()
+                            row_data.append(cell_text.strip())
+                        
+                        representante = self._procesar_fila_representante(row_data, headers)
+                        if representante:
+                            representantes.append(representante)
+                            
+                except Exception as e:
+                    logger.warning(f"Error procesando fila de tabla: {e}")
+                    continue
+                    
+        except Exception as e:
+            logger.warning(f"Error procesando tabla: {e}")
         
-        # Headers inválidos
-        headers_invalidos = [
-            "NOMBRE", "APELLIDOS", "TIPO", "DOC", "CARGO", "FECHA",
-            "DOCUMENTO", "REPRESENTANTE", "LEGAL", "DESDE"
+        return representantes
+    
+    def _procesar_fila_representante(self, row_data: List[str], headers: List[str]) -> Optional[RepresentanteLegal]:
+        """Procesar una fila de datos de representante"""
+        
+        if not row_data or len(row_data) < 2:
+            return None
+        
+        # Mapear campos comunes
+        nombre = ""
+        cargo = ""
+        tipo_doc = "DNI"
+        numero_doc = ""
+        fecha_desde = ""
+        
+        # Buscar nombre (usualmente la primera columna no vacía)
+        for data in row_data:
+            if data and len(data) > 3 and not data.isdigit():
+                # Verificar si parece un nombre
+                if any(char.isalpha() for char in data) and not any(keyword in data.upper() for keyword in ["RUC", "FECHA", "ESTADO"]):
+                    nombre = data
+                    break
+        
+        # Buscar número de documento (8 dígitos para DNI)
+        for data in row_data:
+            if data and data.isdigit() and len(data) == 8:
+                numero_doc = data
+                break
+        
+        # Buscar cargo
+        for data in row_data:
+            if data and any(keyword in data.upper() for keyword in [
+                "GERENTE", "ADMINISTRADOR", "PRESIDENTE", "DIRECTOR", "APODERADO", "REPRESENTANTE"
+            ]):
+                cargo = data
+                break
+        
+        # Buscar fecha
+        for data in row_data:
+            if data and self._parece_fecha(data):
+                fecha_desde = data
+                break
+        
+        # Crear representante si tenemos datos mínimos
+        if nombre and (numero_doc or cargo):
+            return RepresentanteLegal(
+                nombre=nombre,
+                cargo=cargo or "Representante Legal",
+                tipo_doc=tipo_doc,
+                numero_doc=numero_doc,
+                fecha_desde=fecha_desde
+            )
+        
+        return None
+    
+    async def _extraer_de_div(self, div) -> Optional[RepresentanteLegal]:
+        """Extraer representante de un elemento div"""
+        try:
+            div_text = await div.inner_text()
+            lines = div_text.strip().split('\n')
+            
+            # Buscar patrones comunes
+            nombre = ""
+            cargo = ""
+            numero_doc = ""
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Buscar nombre
+                if not nombre and len(line) > 10 and any(char.isalpha() for char in line):
+                    if not any(keyword in line.upper() for keyword in ["RUC", "FECHA", "ESTADO", "DOCUMENTO"]):
+                        nombre = line
+                
+                # Buscar cargo
+                if any(keyword in line.upper() for keyword in [
+                    "GERENTE", "ADMINISTRADOR", "PRESIDENTE", "DIRECTOR", "APODERADO"
+                ]):
+                    cargo = line
+                
+                # Buscar DNI
+                dni_match = re.search(r'\b\d{8}\b', line)
+                if dni_match:
+                    numero_doc = dni_match.group()
+            
+            if nombre:
+                return RepresentanteLegal(
+                    nombre=nombre,
+                    cargo=cargo or "Representante Legal",
+                    tipo_doc="DNI",
+                    numero_doc=numero_doc,
+                    fecha_desde=""
+                )
+                
+        except Exception as e:
+            logger.warning(f"Error extrayendo de div: {e}")
+        
+        return None
+    
+    def _extraer_de_texto_completo(self, texto: str) -> List[RepresentanteLegal]:
+        """Extraer representantes del texto completo usando patrones"""
+        representantes = []
+        
+        try:
+            lines = texto.split('\n')
+            
+            # Buscar patrones que indiquen información de representantes
+            for i, line in enumerate(lines):
+                line = line.strip()
+                
+                # Buscar líneas que contengan cargos típicos
+                if any(keyword in line.upper() for keyword in [
+                    "GERENTE GENERAL", "ADMINISTRADOR", "PRESIDENTE", "DIRECTOR", "APODERADO"
+                ]):
+                    # Buscar nombre en líneas cercanas
+                    nombre_candidato = ""
+                    numero_doc = ""
+                    
+                    # Buscar en líneas anteriores y siguientes
+                    for j in range(max(0, i-2), min(len(lines), i+3)):
+                        candidate_line = lines[j].strip()
+                        
+                        # Buscar nombre (línea con letras, no muy corta)
+                        if (not nombre_candidato and len(candidate_line) > 10 and 
+                            any(char.isalpha() for char in candidate_line) and
+                            not any(kw in candidate_line.upper() for kw in ["RUC", "FECHA", "ESTADO"])):
+                            nombre_candidato = candidate_line
+                        
+                        # Buscar DNI
+                        dni_match = re.search(r'\b\d{8}\b', candidate_line)
+                        if dni_match:
+                            numero_doc = dni_match.group()
+                    
+                    if nombre_candidato:
+                        representante = RepresentanteLegal(
+                            nombre=nombre_candidato,
+                            cargo=line,
+                            tipo_doc="DNI",
+                            numero_doc=numero_doc,
+                            fecha_desde=""
+                        )
+                        representantes.append(representante)
+        
+        except Exception as e:
+            logger.warning(f"Error extrayendo de texto completo: {e}")
+        
+        return representantes
+    
+    def _parece_info_representante(self, texto: str) -> bool:
+        """Verificar si un texto parece contener información de representante"""
+        texto_upper = texto.upper()
+        
+        # Debe contener al menos un cargo y un nombre
+        tiene_cargo = any(keyword in texto_upper for keyword in [
+            "GERENTE", "ADMINISTRADOR", "PRESIDENTE", "DIRECTOR", "APODERADO", "REPRESENTANTE"
+        ])
+        
+        tiene_nombre = len(texto) > 20 and any(char.isalpha() for char in texto)
+        
+        return tiene_cargo and tiene_nombre
+    
+    def _parece_fecha(self, texto: str) -> bool:
+        """Verificar si un texto parece una fecha"""
+        # Patrones comunes de fecha
+        date_patterns = [
+            r'\d{2}/\d{2}/\d{4}',
+            r'\d{2}-\d{2}-\d{4}',
+            r'\d{1,2} de \w+ de \d{4}'
         ]
         
-        if nombre.upper() in headers_invalidos:
+        return any(re.search(pattern, texto) for pattern in date_patterns)
+    
+    def _validar_ruc(self, ruc: str) -> bool:
+        """Validar formato del RUC"""
+        if not ruc or len(ruc) != 11 or not ruc.isdigit():
             return False
         
-        # No debe ser solo guiones
-        if all(char == "-" for char in nombre):
+        primeros_dos_digitos = ruc[:2]
+        if primeros_dos_digitos not in ['10', '20']:
             return False
         
         return True
 
 
-# Instancia singleton del servicio
+# Instancia singleton del servicio SUNAT
 sunat_service = SUNATService()
