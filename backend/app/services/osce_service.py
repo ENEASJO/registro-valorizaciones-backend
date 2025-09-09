@@ -498,6 +498,28 @@ class OSCEService:
         
         lineas = texto_pagina.split('\n')
         
+        # NUEVO: Buscar en líneas después de indicadores de contenido principal
+        # La página OSCE actual muestra el nombre de la empresa al principio del contenido principal
+        for i, linea in enumerate(lineas):
+            linea = linea.strip()
+            # Buscar después de "Buscador de Proveedores del Estado" y "Inicio"
+            if 'Buscador de Proveedores del Estado' in linea or 'Ficha Única del Proveedor' in linea:
+                # Buscar las siguientes líneas que podrían contener la razón social
+                for j in range(1, min(10, len(lineas) - i)):  # Buscar hasta 10 líneas adelante
+                    siguiente_linea = lineas[i + j].strip()
+                    if self._es_razon_social_candidata(siguiente_linea):
+                        logger.info(f"✅ Razón social encontrada (after header): {siguiente_linea}")
+                        return siguiente_linea
+        
+        # NUEVO: Buscar líneas que parecen nombres de empresa al principio del contenido
+        for linea in lineas:
+            linea = linea.strip()
+            # Omitir líneas que claramente no son nombres de empresa
+            if len(linea) > 15 and self._parece_nombre_empresa(linea):
+                if self._es_razon_social_candidata(linea):
+                    logger.info(f"✅ Razón social encontrada (empresa pattern): {linea}")
+                    return linea
+        
         # Buscar en líneas que contengan el RUC
         for linea in lineas:
             linea = linea.strip()
@@ -557,6 +579,64 @@ class OSCEService:
         logger.warning("❌ No se pudo extraer razón social")
         return ""
     
+    def _es_razon_social_candidata(self, linea: str) -> bool:
+        """Determina si una línea es candidata a ser una razón social"""
+        if not linea or len(linea.strip()) < 15:
+            return False
+        
+        linea = linea.strip().upper()
+        
+        # Características que sugieren que es un nombre de empresa
+        indicadores_positivos = [
+            'SOCIEDAD ANONIMA', 'S.A.', 'SAC', 'S.A.C',
+            'CORPORACION', 'CORP', 'EMPRESA', 'COMPAÑIA',
+            'EIRL', 'E.I.R.L', 'SRL', 'S.R.L',
+            'SUPERMERCADOS', 'TIENDAS', 'COMERCIAL', 'INDUSTRIAL',
+            'CONSTRUCTORA', 'INVERSIONES', 'SERVICIOS', 'CONSULTORES'
+        ]
+        
+        # Si tiene algún indicador positivo, es candidata
+        for indicador in indicadores_positivos:
+            if indicador in linea:
+                return True
+        
+        # Si es muy larga y tiene formato de empresa (mayúsculas, palabras separadas)
+        if len(linea) > 25 and linea.count(' ') >= 2 and linea.isupper():
+            return True
+        
+        return False
+    
+    def _parece_nombre_empresa(self, linea: str) -> bool:
+        """Determina si una línea parece ser un nombre de empresa"""
+        if not linea:
+            return False
+            
+        linea_upper = linea.upper().strip()
+        
+        # Exclusiones obvias
+        exclusiones = [
+            'BUSCADOR', 'INICIO', 'BÚSQUEDA', 'FICHA', 'VER MÁS',
+            'IMPLEMENTACIÓN', 'CONFORMIDAD', 'DISPOSICIÓN',
+            'RUC(*)', 'TELÉFONO(*)', 'EMAIL(*)', 'DOMICILIO',
+            'ESTADO', 'CONDICIÓN', 'TIPO', 'VIGENTES:'
+        ]
+        
+        for exclusion in exclusiones:
+            if exclusion in linea_upper:
+                return False
+        
+        # Debe parecer nombre de empresa
+        # Al menos 3 palabras, mayúsculas, longitud razonable
+        palabras = linea_upper.split()
+        if len(palabras) >= 3 and len(linea) >= 20:
+            # Si tiene indicadores de empresa
+            indicadores = ['SOCIEDAD', 'CORPORACION', 'EMPRESA', 'COMPAÑIA', 'SUPERMERCADOS']
+            for indicador in indicadores:
+                if indicador in linea_upper:
+                    return True
+        
+        return False
+    
     def _es_razon_social_valida(self, razon: str) -> bool:
         """Valida que la razón social sea válida"""
         if not razon or len(razon.strip()) < 10:
@@ -569,7 +649,8 @@ class OSCEService:
             "CATEGORIA", "CONSULTOR", "EJECUTOR", "BIENES", "SERVICIOS",
             "VER DETALLE", "IMPRIME", "CHEQUEA", "NECESITA", "TELEFONO",
             "EMAIL", "CORREO", "SUPERINTENDENCIA", "SUNAFIL", "APLICATIVO",
-            "PLANILLA", "ELECTRONICA", "CONTRATISTA", "INFORMACION"
+            "PLANILLA", "ELECTRONICA", "CONTRATISTA", "INFORMACION",
+            "VIGENTES:", "ESTADO(*)", "CONDICION(*)"
         ]
         
         for exclusion in exclusiones:
@@ -583,7 +664,9 @@ class OSCEService:
             r'E\.?I\.?R\.?L\.?$',  # EIRL, E.I.R.L.
             r'CORPORACION',     # CORPORACION
             r'EMPRESA',         # EMPRESA
-            r'COMPAÑIA'         # COMPAÑIA
+            r'COMPAÑIA',        # COMPAÑIA
+            r'SUPERMERCADOS',   # SUPERMERCADOS
+            r'SOCIEDAD ANONIMA' # SOCIEDAD ANONIMA
         ]
         
         # Al menos uno de los formatos debe coincidir
@@ -705,6 +788,10 @@ class OSCEService:
         
         # ✅ Enhanced phone extraction patterns (más específicos)
         patrones_telefono = [
+            # NUEVO: Patrón específico para formato OSCE actual
+            r"Teléfono\(\*\)\s*:\s*([0-9\-]+)",  # "Teléfono(*): 618-8000"
+            r"teléfono\(\*\)\s*:\s*([0-9\-]+)",
+            
             # Standard patterns with labels (más específicos para evitar RUCs)
             r"tel[eé]fono[:\s]*([+]?(?:51[\s\-]?)?[9][0-9]{8})",  # Móviles peruanos
             r"phone[:\s]*([+]?(?:51[\s\-]?)?[9][0-9]{8})",
@@ -877,7 +964,7 @@ class OSCEService:
                 return False
         
         # Length validation
-        if len(telefono_clean) < 7 or len(telefono_clean) > 15:
+        if len(telefono_clean) < 6 or len(telefono_clean) > 15:  # Permitir números de 6 dígitos también
             return False
         
         # Peru mobile pattern (starts with 9, exactly 9 digits)
@@ -886,6 +973,10 @@ class OSCEService:
         
         # Lima landline pattern (exactly 7 digits, starts with 2-7)
         if len(telefono_clean) == 7 and telefono_clean[0] in '234567':
+            return True
+            
+        # NUEVO: Permitir números de 6-7 dígitos (como 618-8000 → 6188000)
+        if len(telefono_clean) in [6, 7]:
             return True
         
         # International format with Peru code
@@ -901,7 +992,7 @@ class OSCEService:
                 return True
         
         # General validation for other formats
-        return len(telefono_clean) >= 7
+        return len(telefono_clean) >= 6
     
     def _validar_email(self, email: str) -> bool:
         """Valida formato básico de email"""
