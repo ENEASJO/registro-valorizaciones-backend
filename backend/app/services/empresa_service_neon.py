@@ -208,17 +208,24 @@ class EmpresaServiceNeon:
     def eliminar_empresa(self, empresa_id: str) -> bool:
         """
         Eliminar empresa de Neon PostgreSQL
-        Intenta por UUID primero, luego por RUC como fallback
+        Determina si es UUID o RUC y busca correctamente
         """
         try:
             logger.info(f"🗑️ Intentando eliminar empresa: {empresa_id}")
             
             with self._get_connection() as conn:
                 with conn.cursor() as cursor:
-                    # Primero verificar si existe la empresa
-                    cursor.execute("SELECT id, ruc, razon_social FROM empresas WHERE id = %s OR ruc = %s;", 
-                                 (empresa_id, empresa_id))
-                    empresa_existente = cursor.fetchone()
+                    empresa_existente = None
+                    
+                    # Determinar si es UUID o RUC
+                    if self._es_uuid(empresa_id):
+                        # Buscar por UUID
+                        cursor.execute("SELECT id, ruc, razon_social FROM empresas WHERE id = %s;", (empresa_id,))
+                        empresa_existente = cursor.fetchone()
+                    else:
+                        # Buscar por RUC
+                        cursor.execute("SELECT id, ruc, razon_social FROM empresas WHERE ruc = %s;", (empresa_id,))
+                        empresa_existente = cursor.fetchone()
                     
                     if not empresa_existente:
                         logger.warning(f"⚠️ Empresa no encontrada para eliminar: {empresa_id}")
@@ -244,6 +251,16 @@ class EmpresaServiceNeon:
             logger.error(f"❌ Error eliminando empresa {empresa_id}: {e}")
             import traceback
             logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            return False
+    
+    def _es_uuid(self, texto: str) -> bool:
+        """
+        Verificar si un texto tiene formato de UUID
+        """
+        try:
+            uuid.UUID(texto)
+            return True
+        except ValueError:
             return False
     
     def _obtener_representantes_por_empresa(self, empresa_id: str) -> List[Dict[str, Any]]:
