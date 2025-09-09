@@ -131,7 +131,7 @@ class EmpresaServiceNeon:
     
     def listar_empresas(self, limit: int = 50) -> List[Dict[str, Any]]:
         """
-        Listar empresas desde Neon
+        Listar empresas desde Neon con sus representantes
         """
         try:
             with self._get_connection() as conn:
@@ -163,6 +163,11 @@ class EmpresaServiceNeon:
                                 empresa_dict['datos_osce'] = json.loads(empresa_dict['datos_osce']) if isinstance(empresa_dict['datos_osce'], str) else empresa_dict['datos_osce']
                             except:
                                 pass
+                        
+                        # Obtener representantes para esta empresa
+                        representantes = self._obtener_representantes_por_empresa(empresa_dict['id'])
+                        empresa_dict['representantes'] = representantes
+                        
                         result.append(empresa_dict)
                     
                     logger.info(f"📋 {len(result)} empresas obtenidas desde Neon")
@@ -174,7 +179,7 @@ class EmpresaServiceNeon:
     
     def obtener_empresa_por_ruc(self, ruc: str) -> Optional[Dict[str, Any]]:
         """
-        Obtener empresa específica por RUC
+        Obtener empresa específica por RUC con sus representantes
         """
         try:
             with self._get_connection() as conn:
@@ -188,6 +193,11 @@ class EmpresaServiceNeon:
                         # Convertir UUID a string
                         if 'id' in empresa_dict and empresa_dict['id']:
                             empresa_dict['id'] = str(empresa_dict['id'])
+                        
+                        # Obtener representantes para esta empresa
+                        representantes = self._obtener_representantes_por_empresa(empresa_dict['id'])
+                        empresa_dict['representantes'] = representantes
+                        
                         return empresa_dict
                     return None
                     
@@ -235,6 +245,93 @@ class EmpresaServiceNeon:
             import traceback
             logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return False
+    
+    def _obtener_representantes_por_empresa(self, empresa_id: str) -> List[Dict[str, Any]]:
+        """
+        Obtener representantes legales de una empresa específica
+        """
+        try:
+            with self._get_connection() as conn:
+                with conn.cursor() as cursor:
+                    query = """
+                        SELECT 
+                            id,
+                            nombre,
+                            cargo,
+                            tipo_documento,
+                            numero_documento,
+                            telefono,
+                            email,
+                            activo,
+                            created_at
+                        FROM representantes_legales 
+                        WHERE empresa_id = %s AND activo = true
+                        ORDER BY created_at DESC;
+                    """
+                    
+                    cursor.execute(query, (empresa_id,))
+                    representantes = cursor.fetchall()
+                    
+                    # Convertir a lista de diccionarios
+                    result = []
+                    for rep in representantes:
+                        rep_dict = dict(rep)
+                        # Convertir UUID a string si es necesario
+                        if 'id' in rep_dict and rep_dict['id']:
+                            rep_dict['id'] = str(rep_dict['id'])
+                        result.append(rep_dict)
+                    
+                    logger.info(f"📋 {len(result)} representantes obtenidos para empresa {empresa_id}")
+                    return result
+                    
+        except Exception as e:
+            logger.error(f"❌ Error obteniendo representantes para empresa {empresa_id}: {e}")
+            return []
+    
+    def obtener_representantes_por_empresa(self, empresa_id: str) -> List[Dict[str, Any]]:
+        """
+        Método público para obtener representantes legales de una empresa
+        """
+        return self._obtener_representantes_por_empresa(empresa_id)
+    
+    def guardar_representante(self, empresa_id: str, representante_data: Dict[str, Any]) -> Optional[str]:
+        """
+        Guardar un representante legal para una empresa
+        """
+        try:
+            with self._get_connection() as conn:
+                with conn.cursor() as cursor:
+                    # Generar ID único para el representante
+                    representante_id = str(uuid.uuid4())
+                    
+                    query = """
+                        INSERT INTO representantes_legales (
+                            id, empresa_id, nombre, cargo, 
+                            tipo_documento, numero_documento, 
+                            telefono, email, activo, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                    """
+                    
+                    cursor.execute(query, (
+                        representante_id,
+                        empresa_id,
+                        representante_data.get('nombre', ''),
+                        representante_data.get('cargo', ''),
+                        representante_data.get('tipo_documento', 'DNI'),
+                        representante_data.get('numero_documento', ''),
+                        representante_data.get('telefono', ''),
+                        representante_data.get('email', ''),
+                        True,
+                        datetime.now()
+                    ))
+                    
+                    conn.commit()
+                    logger.info(f"✅ Representante guardado para empresa {empresa_id}: {representante_data.get('nombre')}")
+                    return representante_id
+                    
+        except Exception as e:
+            logger.error(f"❌ Error guardando representante para empresa {empresa_id}: {e}")
+            return None
     
     def get_stats(self) -> Dict[str, Any]:
         """Obtener estadísticas básicas"""
