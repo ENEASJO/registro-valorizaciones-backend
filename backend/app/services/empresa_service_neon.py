@@ -205,52 +205,56 @@ class EmpresaServiceNeon:
             logger.error(f"❌ Error obteniendo empresa por RUC {ruc}: {e}")
             return None
     
-    def eliminar_empresa(self, empresa_id: str) -> bool:
+    def eliminar_empresa(self, identificador_empresa: str) -> bool:
         """
-        Eliminar empresa de Neon PostgreSQL
-        Determina si es UUID o RUC y busca correctamente
+        NUEVA IMPLEMENTACIÓN - Eliminar empresa de Neon PostgreSQL
+        Detecta UUID vs RUC automáticamente y busca correctamente
         """
         try:
-            logger.info(f"🗑️ Intentando eliminar empresa: {empresa_id}")
+            logger.info(f"🗑️ NUEVA IMPLEMENTACIÓN - Eliminando empresa: {identificador_empresa}")
+            
+            # Test UUID detection
+            es_formato_uuid = self._es_uuid(identificador_empresa)
+            logger.info(f"🔍 Formato UUID detectado: {es_formato_uuid}")
             
             with self._get_connection() as conn:
-                with conn.cursor() as cursor:
-                    empresa_existente = None
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                    empresa_encontrada = None
                     
-                    # Determinar si es UUID o RUC
-                    if self._es_uuid(empresa_id):
-                        # Buscar por UUID
-                        cursor.execute("SELECT id, ruc, razon_social FROM empresas WHERE id = %s;", (empresa_id,))
-                        empresa_existente = cursor.fetchone()
+                    # Buscar empresa según el formato detectado
+                    if es_formato_uuid:
+                        logger.info(f"🔍 Buscando empresa por UUID: {identificador_empresa}")
+                        cursor.execute("SELECT id, ruc, razon_social FROM empresas WHERE id = %s;", (identificador_empresa,))
+                        empresa_encontrada = cursor.fetchone()
                     else:
-                        # Buscar por RUC
-                        cursor.execute("SELECT id, ruc, razon_social FROM empresas WHERE ruc = %s;", (empresa_id,))
-                        empresa_existente = cursor.fetchone()
+                        logger.info(f"🔍 Buscando empresa por RUC: {identificador_empresa}")
+                        cursor.execute("SELECT id, ruc, razon_social FROM empresas WHERE ruc = %s;", (identificador_empresa,))
+                        empresa_encontrada = cursor.fetchone()
                     
-                    if not empresa_existente:
-                        logger.warning(f"⚠️ Empresa no encontrada para eliminar: {empresa_id}")
+                    if not empresa_encontrada:
+                        logger.warning(f"⚠️ EMPRESA NO ENCONTRADA para eliminar: {identificador_empresa}")
                         return False
                     
-                    logger.info(f"📋 Empresa encontrada: ID={empresa_existente['id']}, RUC={empresa_existente['ruc']}, Nombre={empresa_existente['razon_social']}")
+                    logger.info(f"📋 EMPRESA ENCONTRADA: ID={empresa_encontrada['id']}, RUC={empresa_encontrada['ruc']}, Nombre={empresa_encontrada['razon_social']}")
                     
-                    # Eliminar por ID (más preciso)
-                    query = "DELETE FROM empresas WHERE id = %s;"
-                    cursor.execute(query, (empresa_existente['id'],))
+                    # Eliminar usando el ID UUID de la empresa encontrada
+                    delete_query = "DELETE FROM empresas WHERE id = %s;"
+                    cursor.execute(delete_query, (empresa_encontrada['id'],))
                     
-                    rows_deleted = cursor.rowcount
+                    filas_eliminadas = cursor.rowcount
                     conn.commit()
                     
-                    if rows_deleted > 0:
-                        logger.info(f"✅ Empresa eliminada exitosamente - ID: {empresa_existente['id']}, RUC: {empresa_existente['ruc']}")
+                    if filas_eliminadas > 0:
+                        logger.info(f"✅ ELIMINACIÓN EXITOSA - ID: {empresa_encontrada['id']}, RUC: {empresa_encontrada['ruc']}")
                         return True
                     else:
-                        logger.error(f"❌ Error: No se pudo eliminar la empresa aunque fue encontrada: {empresa_id}")
+                        logger.error(f"❌ ERROR: No se eliminaron filas aunque la empresa fue encontrada: {identificador_empresa}")
                         return False
                         
-        except Exception as e:
-            logger.error(f"❌ Error eliminando empresa {empresa_id}: {e}")
+        except Exception as exception:
+            logger.error(f"❌ ERROR eliminando empresa {identificador_empresa}: {exception}")
             import traceback
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Traceback completo: {traceback.format_exc()}")
             return False
     
     def _es_uuid(self, texto: str) -> bool:
