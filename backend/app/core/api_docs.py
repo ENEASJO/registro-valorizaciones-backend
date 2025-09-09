@@ -79,7 +79,7 @@ API REST optimizada para el manejo de notificaciones automáticas de WhatsApp Bu
                                 │
                     ┌──────────────────┐
                     │    Database      │
-                    │   (Turso/SQLite) │
+                    │   (Neon/PostgreSQL) │
                     └──────────────────┘
 ```
 

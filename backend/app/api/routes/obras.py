@@ -7,7 +7,8 @@ from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime
 
-from app.services.obra_service_turso import ObraServiceTurso
+# from app.services.obra_service_turso import ObraServiceTurso
+# TODO: Migrar a servicio Neon cuando esté disponible
 from app.models.obra import ObraCreate, ObraUpdate, ObraResponse, ESTADOS_OBRA
 from app.utils.exceptions import ValidationException
 

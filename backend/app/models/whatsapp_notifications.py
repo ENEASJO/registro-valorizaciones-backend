@@ -1,6 +1,6 @@
 """
 Modelos SQLAlchemy para el sistema de notificaciones WhatsApp
-Base de datos: Turso (SQLite)
+Base de datos: Neon (PostgreSQL)
 """
 
 from sqlalchemy import Column, Integer, String, Text, Boolean, TIMESTAMP, DECIMAL, Date, ForeignKey, Time

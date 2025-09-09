@@ -10,14 +10,14 @@ Sistema integral para gestión de empresas, obras y valorizaciones con extracci�
 - **💰 Valorizaciones**: Registro mensual de avances de obra
 - **🤖 Extracción Automatizada**: Web scraping de SUNAT y OSCE con Playwright
 - **⚡ Optimizaciones TURBO**: Extracción OSCE en 3-8 segundos
-- **🔄 Migración a Supabase**: Base de datos PostgreSQL escalable
+- **🔄 Base de Datos Neon**: PostgreSQL escalable y confiable
 
 ## 🏗️ Arquitectura
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   FRONTEND      │    │    BACKEND      │    │   DATABASE      │
-│   (Vercel)      │◄──►│  (Cloud Run)    │◄──►│   (Supabase)    │
+│   (Vercel)      │◄──►│  (Cloud Run)    │◄──►│     (Neon)      │
 │                 │    │                 │    │                 │
 │ - React 18      │    │ - FastAPI       │    │ - PostgreSQL    │
 │ - TypeScript    │    │ - Python 3.11   │    │ - Row Level     │
@@ -43,7 +43,7 @@ registro-valorizaciones/
 │   ├── 📂 app/
 │   │   ├── 📂 api/routes/          # Rutas de API
 │   │   ├── 📂 services/            # Lógica de negocio
-│   │   │   ├── empresa_service_supabase.py
+│   │   │   ├── empresa_service_neon.py
 │   │   │   ├── osce_turbo_service.py
 │   │   │   └── precache_service.py
 │   │   └── 📂 utils/               # Utilidades
@@ -60,10 +60,10 @@ registro-valorizaciones/
 │   ├── 📄 vite.config.ts          # Configuración Vite
 │   └── 📄 vercel.json            # Configuración Vercel
 ├── 📂 database/
-│   └── 📄 schema.sql              # Esquema Supabase
+│   └── 📄 schema.sql              # Esquema Neon PostgreSQL
 ├── 📂 scripts/
-│   └── 📄 setup-supabase.py       # Scripts de configuración
-├── 📄 .mcp.json                   # Configuración MCP Supabase
+│   └── 📄 setup-neon.py           # Scripts de configuración
+├── 📄 .mcp.json                   # Configuración MCP Neon
 ├── 📄 cloudbuild.yaml            # CI/CD Google Cloud
 └── 📄 README.md                   # Este archivo
 ```
@@ -133,7 +133,7 @@ El sistema está diseñado específicamente para la estructura territorial del D
 - **React 18** con TypeScript
 - **Vite** para desarrollo y build
 - **Tailwind CSS** para estilos
-- **Supabase** para base de datos
+- **Neon PostgreSQL** para base de datos
 
 ### Backend (FastAPI + Python)
 **Ubicación:** `backend/`  
@@ -142,7 +142,7 @@ El sistema está diseñado específicamente para la estructura territorial del D
 
 - **FastAPI** + Uvicorn
 - **Playwright** para web scraping SUNAT/OSCE
-- **Turso/SQLite** para base de datos
+- **Neon PostgreSQL** para base de datos
 - **Redis** para caché y optimización
 
 ## 📋 Marco Normativo

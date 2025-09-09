@@ -1,5 +1,5 @@
 """
-API endpoints para gestión de empresas (usando Turso)
+API endpoints para gestión de empresas (usando Neon)
 """
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, status
@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from app.services.empresa_service_turso_enhanced import EmpresaServiceTurso
+from app.services.empresa_service_neon import empresa_service_neon
 from app.models.empresa import (
     EmpresaCreateSchema,
     EmpresaResponse,
@@ -19,8 +19,8 @@ from app.models.empresa import (
 
 router = APIRouter(prefix="/api/empresas", tags=["empresas"])
 
-# Instancia del servicio Turso
-empresa_service = EmpresaServiceTurso()
+# Instancia del servicio Neon
+empresa_service = empresa_service_neon
 
 def validar_ruc(ruc: str) -> bool:
     """Validar formato de RUC"""

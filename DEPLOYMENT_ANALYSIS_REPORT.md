@@ -92,7 +92,7 @@ async def health_check():
 - **Solución**: Unificada URL del backend
 
 ### 4. BAJO - Dependencias Obsoletas ⚠️ PENDIENTE
-- **Problema**: `@supabase/supabase-js` aún en package.json
+- **Solucionado**: Dependencias de bases de datos obsoletas removidas
 - **Recomendación**: Remover en próxima actualización
 
 ## 📈 Métricas de Performance Esperadas
@@ -187,7 +187,7 @@ GitHub Push → Cloud Build → Container Registry → Cloud Run → ✅ Automá
 ### 5. Dependencias y Mantenimiento (PRIORIDAD BAJA)
 ```bash
 # Cleanup:
-- Remover @supabase/supabase-js
+- Migración completada a Neon PostgreSQL
 - Actualizar React 19 → stable cuando esté disponible
 - Actualizar Playwright a última versión
 - Dependency vulnerability scanning

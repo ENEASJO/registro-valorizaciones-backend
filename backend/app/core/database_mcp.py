@@ -41,9 +41,7 @@ class DatabaseMCP:
         self.db_user = os.getenv('CLOUD_SQL_USER', 'postgres')
         self.db_password = os.getenv('CLOUD_SQL_PASSWORD')
         
-        # Configuración alternativa para desarrollo local con Supabase
-        self.supabase_url = os.getenv('SUPABASE_URL')
-        self.supabase_key = os.getenv('SUPABASE_ANON_KEY')
+        # Configuración alternativa para desarrollo local con Neon
         self.database_url = os.getenv('DATABASE_URL')
         
         # MCP Configuration
@@ -110,8 +108,6 @@ class DatabaseMCP:
         try:
             if self._is_cloud_run_environment():
                 return await self._init_cloud_sql_connection()
-            elif self.supabase_url:
-                return await self._init_supabase_connection()
             elif self.database_url:
                 return await self._init_direct_connection()
             else:
@@ -181,48 +177,9 @@ class DatabaseMCP:
             print(f"❌ Error en conexión Cloud SQL: {e}")
             return False
 
-    async def _init_supabase_connection(self) -> bool:
-        """
-        Inicializa conexión usando Supabase (para desarrollo)
-        """
-        try:
-            print("🔗 Inicializando conexión Supabase...")
-            
-            # Extraer detalles de conexión desde URL de Supabase
-            if "supabase.co" in self.supabase_url:
-                # Construir URL de conexión PostgreSQL para Supabase
-                supabase_host = self.supabase_url.replace("https://", "").replace("http://", "")
-                supabase_project = supabase_host.split(".")[0]
-                
-                connection_string = f"postgresql+asyncpg://postgres:{os.getenv('SUPABASE_DB_PASSWORD', self.db_password)}@db.{supabase_project}.supabase.co:5432/postgres"
-            else:
-                connection_string = self.database_url
-            
-            self.engine = create_async_engine(
-                connection_string,
-                echo=False,
-                pool_size=5,
-                max_overflow=2,
-                pool_pre_ping=True
-            )
-            
-            self.async_session_maker = async_sessionmaker(
-                self.engine,
-                class_=AsyncSession,
-                expire_on_commit=False
-            )
-            
-            # Probar conexión
-            async with self.async_session_maker() as session:
-                result = await session.execute(text("SELECT 1"))
-                await session.commit()
-            
-            print("✅ Conexión Supabase establecida correctamente")
-            return True
-            
-        except Exception as e:
-            print(f"❌ Error en conexión Supabase: {e}")
-            return False
+    #     """
+    #     # Método deshabilitado - ahora usamos Neon exclusivamente
+    #     return False
 
     async def _init_direct_connection(self) -> bool:
         """

@@ -7,7 +7,8 @@ from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime
 
-from app.services.valorizacion_service_turso import ValorizacionServiceTurso
+# from app.services.valorizacion_service_turso import ValorizacionServiceTurso
+# TODO: Migrar a servicio Neon cuando esté disponible
 from app.models.valorizacion import ValorizacionCreate, ValorizacionUpdate, ESTADOS_VALORIZACION, TIPOS_VALORIZACION
 from app.utils.exceptions import ValidationException
 
