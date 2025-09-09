@@ -9,7 +9,7 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 
 from app.models.osce import EmpresaOSCE, IntegranteOSCE, EspecialidadOSCE, ContactoOSCE
 from app.utils.exceptions import BaseAppException, ValidationException, ExtractionException
-from app.services.osce_service_improved import osce_improved
+# Eliminado import del servicio experimental osce_service_improved
 from app.utils.playwright_helper import get_browser_launch_options
 
 logger = logging.getLogger(__name__)
