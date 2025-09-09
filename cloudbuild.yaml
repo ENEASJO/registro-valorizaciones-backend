@@ -29,7 +29,7 @@ steps:
     - '--timeout=900s'
     - '--max-instances=10'
     - '--cpu-boost'
-    - '--set-env-vars=DEBUG=false,LOG_LEVEL=INFO,HOST=0.0.0.0,TURSO_DATABASE_URL=$(TURSO_DATABASE_URL),TURSO_AUTH_TOKEN=$(TURSO_AUTH_TOKEN)'
+    - '--set-env-vars=DEBUG=false,LOG_LEVEL=INFO,HOST=0.0.0.0,NEON_CONNECTION_STRING=$(NEON_CONNECTION_STRING),ENVIRONMENT=production'
 
 images:
   - 'gcr.io/$PROJECT_ID/registro-valorizaciones:$COMMIT_SHA'
