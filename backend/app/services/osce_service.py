@@ -378,9 +378,9 @@ class OSCEService:
         logger.info("📄 Extrayendo estado de registro...")
         estado_registro = await self._extraer_estado_registro(texto_pagina)
         
-        # Extraer información de contacto (MEJORADO)
-        contacto_mejorado = await osce_improved.extraer_contacto_mejorado(page, texto_pagina)
-        contacto = ContactoOSCE(**contacto_mejorado)
+        # Extraer información de contacto
+        logger.info("📄 Extrayendo información de contacto...")
+        contacto = await self._extraer_informacion_contacto(page, texto_pagina)
         
         # Extraer especialidades
         logger.info("=== INICIANDO EXTRACCIÓN DE ESPECIALIDADES ===")
@@ -411,8 +411,21 @@ class OSCEService:
             else:
                 print(f"❌ DEBUG: '{dni}' NO encontrado en página")
         
-        # Intentar extracción mejorada y método directo
-        representantes_data = await osce_improved.extraer_representantes_consolidados(page, texto_pagina, razon_social)
+        # Extraer integrantes/miembros (MEJORADO - CON DNI Y CARGOS CONSOLIDADOS)
+        logger.info("=== INICIANDO EXTRACCIÓN DE REPRESENTANTES CONSOLIDADOS ===")
+        print(f"🔍 DEBUG: Texto de página contiene {len(texto_pagina)} caracteres")
+        print(f"🔍 DEBUG: Primeros 500 chars: {texto_pagina[:500]}")
+        
+        # Buscar DNIs específicos
+        dnis_objetivo = ["42137216", "VERAMENDI", "ZORRILLA", "LEVI", "EDON"]
+        for dni in dnis_objetivo:
+            if dni in texto_pagina:
+                print(f"✅ DEBUG: '{dni}' encontrado en página")
+            else:
+                print(f"❌ DEBUG: '{dni}' NO encontrado en página")
+        
+        # Extraer integrantes usando el método existente
+        representantes_data = await self._extraer_integrantes(page, texto_pagina, razon_social)
         print(f"🔍 DEBUG: Representantes extraídos por método consolidado: {len(representantes_data)}")
         
         # Método alternativo: extracción directa de DNIs desde texto
@@ -421,17 +434,22 @@ class OSCEService:
             representantes_directos = await self._extraer_representantes_metodo_directo(texto_pagina)
             representantes_data.extend(representantes_directos)
         
-        # Convertir a objetos IntegranteOSCE
+        # Convertir a objetos IntegranteOSCE (manejar tanto diccionarios como objetos existentes)
         integrantes = []
         for rep_data in representantes_data:
             try:
-                integrante = IntegranteOSCE(
-                    nombre=rep_data.get('nombre', ''),
-                    cargo=rep_data.get('cargo', 'SOCIO'),
-                    participacion="",  # No disponible en OSCE
-                    tipo_documento=rep_data.get('tipo_documento', 'DNI'),
-                    numero_documento=rep_data.get('dni', '')
-                )
+                # Si ya es un objeto IntegranteOSCE, agregarlo directamente
+                if isinstance(rep_data, IntegranteOSCE):
+                    integrante = rep_data
+                else:
+                    # Si es un diccionario, crear el objeto
+                    integrante = IntegranteOSCE(
+                        nombre=rep_data.get('nombre', ''),
+                        cargo=rep_data.get('cargo', 'SOCIO'),
+                        participacion="",  # No disponible en OSCE
+                        tipo_documento=rep_data.get('tipo_documento', 'DNI'),
+                        numero_documento=rep_data.get('dni', '')
+                    )
                 integrantes.append(integrante)
                 logger.info(f"✅ Representante consolidado: {integrante.nombre} - DNI: {integrante.numero_documento} - Cargo: {integrante.cargo}")
             except Exception as e:
