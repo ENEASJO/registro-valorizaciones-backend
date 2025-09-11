@@ -1270,6 +1270,45 @@ class OSCEService:
         
         return especialidades_unicas[:15]  # Limitar a 15
     
+    def _agregar_integrante_con_deduplicacion_temprana(self, integrantes: List[IntegranteOSCE], nuevo_integrante: IntegranteOSCE) -> List[IntegranteOSCE]:
+        """Agrega un integrante con deduplicación temprana para evitar duplicados"""
+        # Verificar duplicado exacto (mismo nombre y mismo cargo)
+        for integrante_existente in integrantes:
+            if (integrante_existente.nombre == nuevo_integrante.nombre and 
+                integrante_existente.cargo == nuevo_integrante.cargo):
+                logger.debug(f"🚫 Duplicado exacto detectado y evitado: {nuevo_integrante.nombre} - {nuevo_integrante.cargo}")
+                return integrantes
+        
+        # Verificar duplicado por similitud de nombre
+        nombre_normalizado = self._normalizar_nombre_para_similitud(nuevo_integrante.nombre)
+        for integrante_existente in integrantes:
+            nombre_existente_normalizado = self._normalizar_nombre_para_similitud(integrante_existente.nombre)
+            if self._calcular_similitud_nombres(nombre_normalizado, nombre_existente_normalizado) > 0.8:
+                # Si hay similitud, comparar prioridad de cargos
+                prioridad_cargos = {
+                    "GERENTE GENERAL": 10, "DIRECTOR GENERAL": 9, "PRESIDENTE": 8, "VICEPRESIDENTE": 7,
+                    "GERENTE": 6, "DIRECTOR": 5, "ADMINISTRADOR": 4, "REPRESENTANTE LEGAL": 3,
+                    "SECRETARIO": 2, "TESORERO": 2, "ACCIONISTA": 1, "SOCIO": 1,
+                    "GERENTE ADMINISTRATIVO": 5, "GERENTE COMERCIAL": 5, "GERENTE FINANCIERO": 5,
+                    "DIRECTOR EJECUTIVO": 8, "APODERADO": 2, "VOCAL": 1
+                }
+                
+                prioridad_nuevo = prioridad_cargos.get(nuevo_integrante.cargo, 0)
+                prioridad_existente = prioridad_cargos.get(integrante_existente.cargo, 0)
+                
+                if prioridad_nuevo > prioridad_existente:
+                    logger.info(f"🔄 Reemplazando {integrante_existente.nombre} ({integrante_existente.cargo}) por {nuevo_integrante.nombre} ({nuevo_integrante.cargo}) - mejor prioridad")
+                    integrantes.remove(integrante_existente)
+                    integrantes.append(nuevo_integrante)
+                else:
+                    logger.debug(f"🚫 Integrante similar descartado por menor prioridad: {nuevo_integrante.nombre} ({nuevo_integrante.cargo})")
+                return integrantes
+        
+        # Si no hay duplicados, agregar el nuevo integrante
+        integrantes.append(nuevo_integrante)
+        logger.debug(f"✅ Integrante agregado: {nuevo_integrante.nombre} - {nuevo_integrante.cargo}")
+        return integrantes
+    
     async def _extraer_integrantes(self, page, texto_pagina: str, razon_social: str = "") -> List[IntegranteOSCE]:
         """Extrae información de integrantes/miembros de la empresa"""
         logger.info("Extrayendo integrantes de la empresa")
@@ -1279,7 +1318,8 @@ class OSCEService:
         # First try the specific OSCE pattern extraction with known DNI mapping
         integrantes_osce = self._extraer_integrantes_patron_osce(texto_pagina.split('\n'))
         if integrantes_osce:
-            integrantes.extend(integrantes_osce)
+            for integrante in integrantes_osce:
+                integrantes = self._agregar_integrante_con_deduplicacion_temprana(integrantes, integrante)
             logger.info(f"Integrantes encontrados con patrón OSCE: {len(integrantes_osce)}")
         
         # Always try to find specific known members with correct DNI mapping
@@ -1302,10 +1342,10 @@ class OSCEService:
                 integrantes[existing_index].tipo_documento = integrante_info['tipo_documento']
                 logger.info(f"🔄 DNI actualizado para {integrante_info['nombre']}: {integrante_info['numero_documento']}")
             else:
-                # Add new member
+                # Add new member with early deduplication
                 try:
                     integrante = IntegranteOSCE(**integrante_info)
-                    integrantes.append(integrante)
+                    integrantes = self._agregar_integrante_con_deduplicacion_temprana(integrantes, integrante)
                     logger.info(f"➕ Integrante específico agregado: {integrante_info['nombre']} - DNI: {integrante_info['numero_documento']}")
                 except Exception as e:
                     logger.warning(f"Error creando integrante específico {integrante_info['nombre']}: {str(e)}")
@@ -1351,12 +1391,14 @@ class OSCEService:
         if not integrantes:
             integrantes_from_text = await self._extraer_integrantes_desde_texto_mejorado(page, texto_pagina)
             if integrantes_from_text:
-                integrantes.extend(integrantes_from_text)
+                for integrante in integrantes_from_text:
+                    integrantes = self._agregar_integrante_con_deduplicacion_temprana(integrantes, integrante)
         
         # Try to navigate to specific sections
         integrantes_from_sections = await self._extraer_integrantes_desde_secciones(page)
         if integrantes_from_sections:
-            integrantes.extend(integrantes_from_sections)
+            for integrante in integrantes_from_sections:
+                integrantes = self._agregar_integrante_con_deduplicacion_temprana(integrantes, integrante)
         
         try:
             # Buscar en tablas que puedan contener información de integrantes
@@ -1506,7 +1548,7 @@ class OSCEService:
                     if integrante_data["nombre"] and self._es_nombre_persona_valido(integrante_data["nombre"]):
                         try:
                             integrante = IntegranteOSCE(**integrante_data)
-                            integrantes.append(integrante)
+                            integrantes = self._agregar_integrante_con_deduplicacion_temprana(integrantes, integrante)
                             logger.info(f"✅ Integrante procesado: {integrante_data['nombre']} - {integrante_data['cargo']}")
                         except Exception as e:
                             logger.warning(f"Error creando integrante: {str(e)}")
@@ -2586,12 +2628,120 @@ class OSCEService:
 
 
     def _aplicar_deduplicacion_con_prioridad(self, integrantes: List[IntegranteOSCE]) -> List[IntegranteOSCE]:
-        """Aplica deduplicación inteligente con prioridad de cargos"""
+        """Aplica deduplicación inteligente con prioridad de cargos y similitud de nombres"""
+        if not integrantes:
+            return integrantes
+            
+        logger.info(f"🔍 Iniciando deduplicación avanzada con {len(integrantes)} integrantes")
+        
+        # Primero: deduplicación exacta por nombre y cargo
+        integrantes = self._eliminar_duplicados_exactos(integrantes)
+        logger.info(f"📝 Tras deduplicación exacta: {len(integrantes)} integrantes")
+        
+        # Segundo: deduplicación por similitud de nombres
+        integrantes = self._aplicar_deduplicacion_similitud(integrantes)
+        logger.info(f"📝 Tras deduplicación por similitud: {len(integrantes)} integrantes")
+        
+        # Tercero: priorización por cargo para nombres similares
+        integrantes_finales = self._priorizar_por_cargo(integrantes)
+        
+        logger.info(f"✅ Deduplicación completada: {len(integrantes)} -> {len(integrantes_finales)} integrantes")
+        return integrantes_finales
+    
+    def _eliminar_duplicados_exactos(self, integrantes: List[IntegranteOSCE]) -> List[IntegranteOSCE]:
+        """Elimina duplicados exactos (mismo nombre y mismo cargo)"""
+        vistos = set()
+        integrantes_unicos = []
+        
+        for integrante in integrantes:
+            # Crear clave única para duplicados exactos
+            clave = (integrante.nombre, integrante.cargo)
+            
+            if clave not in vistos:
+                vistos.add(clave)
+                integrantes_unicos.append(integrante)
+                logger.debug(f"✅ Manteniendo integrante único: {integrante.nombre} - {integrante.cargo}")
+            else:
+                logger.debug(f"❌ Eliminando duplicado exacto: {integrante.nombre} - {integrante.cargo}")
+        
+        return integrantes_unicos
+    
+    def _aplicar_deduplicacion_similitud(self, integrantes: List[IntegranteOSCE]) -> List[IntegranteOSCE]:
+        """Aplica deduplicación basada en similitud de nombres"""
         if not integrantes:
             return integrantes
             
         integrantes_finales = []
+        nombres_procesados = set()
         
+        for integrante in integrantes:
+            nombre_normalizado = self._normalizar_nombre_para_similitud(integrante.nombre)
+            
+            # Verificar si este nombre ya fue procesado (considerando similitud)
+            if not self._nombre_similar_ya_procesado(nombre_normalizado, nombres_procesados):
+                integrantes_finales.append(integrante)
+                nombres_procesados.add(nombre_normalizado)
+                logger.debug(f"✅ Manteniendo integrante (no similar): {integrante.nombre}")
+            else:
+                logger.debug(f"❌ Eliminando integrante similar: {integrante.nombre}")
+        
+        return integrantes_finales
+    
+    def _normalizar_nombre_para_similitud(self, nombre: str) -> str:
+        """Normaliza un nombre para comparación por similitud"""
+        if not nombre:
+            return ""
+            
+        # Convertir a mayúsculas y quitar espacios extra
+        nombre = re.sub(r'\s+', ' ', nombre.strip().upper())
+        
+        # Quitar partículas comunes que no afectan la identidad
+        particulas = ['DE', 'LA', 'LOS', 'LAS', 'DEL', 'Y', 'E', 'SAN', 'SANTA']
+        palabras = nombre.split()
+        
+        # Mantener solo palabras significativas (más de 2 caracteres)
+        palabras_filtradas = [p for p in palabras if len(p) > 2 and p not in particulas]
+        
+        return ' '.join(palabras_filtradas)
+    
+    def _nombre_similar_ya_procesado(self, nombre_normalizado: str, nombres_procesados: set) -> bool:
+        """Verifica si un nombre ya fue procesado considerando similitud"""
+        if nombre_normalizado in nombres_procesados:
+            return True
+            
+        # Verificar similitud con nombres ya procesados
+        for nombre_procesado in nombres_procesados:
+            if self._calcular_similitud_nombres(nombre_normalizado, nombre_procesado) > 0.8:
+                return True
+                
+        return False
+    
+    def _calcular_similitud_nombres(self, nombre1: str, nombre2: str) -> float:
+        """Calcula similitud entre dos nombres usando distancia de Levenshtein"""
+        if nombre1 == nombre2:
+            return 1.0
+            
+        if not nombre1 or not nombre2:
+            return 0.0
+            
+        # Implementación simple de similitud basada en palabras comunes
+        palabras1 = set(nombre1.split())
+        palabras2 = set(nombre2.split())
+        
+        if not palabras1 or not palabras2:
+            return 0.0
+            
+        # Calcular intersección de palabras
+        interseccion = palabras1.intersection(palabras2)
+        union = palabras1.union(palabras2)
+        
+        if not union:
+            return 0.0
+            
+        return len(interseccion) / len(union)
+    
+    def _priorizar_por_cargo(self, integrantes: List[IntegranteOSCE]) -> List[IntegranteOSCE]:
+        """Aplica priorización de cargos a los integrantes"""
         # Prioridad de cargos (mayor número = mayor prioridad)
         prioridad_cargos = {
             "GERENTE GENERAL": 10,
@@ -2615,14 +2765,6 @@ class OSCEService:
             "VOCAL": 1
         }
         
-        # Agrupar por nombre
-        integrantes_por_nombre = {}
-        for integrante in integrantes:
-            nombre = integrante.nombre
-            if nombre not in integrantes_por_nombre:
-                integrantes_por_nombre[nombre] = []
-            integrantes_por_nombre[nombre].append(integrante)
-        
         # Mapeo de DNI conocidos para priorización (casos específicos conocidos)
         mapeo_dni_conocidos = {
             'SILVA SIGUEÑAS JULIO ROGER': '7523236',
@@ -2632,75 +2774,68 @@ class OSCEService:
             'DIAZ GARAY EDGARDO NIVARDO': '42137216'
         }
         
-        # Para cada nombre, seleccionar el integrante con cargo de mayor prioridad y DNI correcto
-        for nombre, lista_integrantes in integrantes_por_nombre.items():
+        # Agrupar por nombre normalizado para priorización
+        integrantes_por_nombre = {}
+        for integrante in integrantes:
+            nombre_normalizado = self._normalizar_nombre_para_similitud(integrante.nombre)
+            if nombre_normalizado not in integrantes_por_nombre:
+                integrantes_por_nombre[nombre_normalizado] = []
+            integrantes_por_nombre[nombre_normalizado].append(integrante)
+        
+        integrantes_finales = []
+        
+        # Para cada nombre normalizado, seleccionar el mejor integrante
+        for nombre_normalizado, lista_integrantes in integrantes_por_nombre.items():
             if len(lista_integrantes) == 1:
                 # Solo un integrante con este nombre
                 integrante_unico = lista_integrantes[0]
                 
                 # Si este nombre tiene DNI conocido y no coincide, corregirlo
-                if nombre in mapeo_dni_conocidos:
-                    dni_correcto = mapeo_dni_conocidos[nombre]
+                if integrante_unico.nombre in mapeo_dni_conocidos:
+                    dni_correcto = mapeo_dni_conocidos[integrante_unico.nombre]
                     if (not integrante_unico.numero_documento or 
                         integrante_unico.numero_documento != dni_correcto):
-                        logger.info(f"🔧 Corrigiendo DNI en deduplicación para {nombre}: {dni_correcto}")
-                        try:
-                            integrante_corregido = IntegranteOSCE(
-                                nombre=integrante_unico.nombre,
-                                cargo=integrante_unico.cargo,
-                                participacion=integrante_unico.participacion or "",
-                                tipo_documento="DNI",
-                                numero_documento=dni_correcto
-                            )
-                            integrantes_finales.append(integrante_corregido)
-                        except Exception as e:
-                            logger.warning(f"Error corrigiendo DNI en deduplicación para {nombre}: {str(e)}")
-                            integrantes_finales.append(integrante_unico)
-                    else:
-                        integrantes_finales.append(integrante_unico)
-                else:
-                    integrantes_finales.append(integrante_unico)
-                    
-                logger.debug(f"✓ Único integrante: {nombre} - {lista_integrantes[0].cargo}")
-            else:
-                # Múltiples integrantes con el mismo nombre
+                        logger.info(f"🔧 Corrigiendo DNI en deduplicación para {integrante_unico.nombre}: {dni_correcto}")
+                        integrante_unico = self._crear_integrante_corregido(integrante_unico, dni_correcto)
                 
-                # ALWAYS select the best cargo first, regardless of DNI
+                integrantes_finales.append(integrante_unico)
+                logger.debug(f"✓ Único integrante: {integrante_unico.nombre} - {integrante_unico.cargo}")
+            else:
+                # Múltiples integrantes con nombre similar - seleccionar el mejor cargo
                 mejor_integrante = max(
                     lista_integrantes,
                     key=lambda x: prioridad_cargos.get(x.cargo, 0)
                 )
                 
-                # Then, if this name has a known DNI mapping, correct the DNI
-                if nombre in mapeo_dni_conocidos:
-                    dni_correcto = mapeo_dni_conocidos[nombre]
-                    # Check if we need to correct the DNI
+                # Si el nombre tiene mapeo de DNI conocido, corregirlo
+                if mejor_integrante.nombre in mapeo_dni_conocidos:
+                    dni_correcto = mapeo_dni_conocidos[mejor_integrante.nombre]
                     if (not mejor_integrante.numero_documento or 
                         mejor_integrante.numero_documento != dni_correcto):
-                        logger.info(f"🔧 Corrigiendo DNI para {nombre} (mejor cargo: {mejor_integrante.cargo}): {dni_correcto}")
-                        try:
-                            mejor_integrante = IntegranteOSCE(
-                                nombre=mejor_integrante.nombre,
-                                cargo=mejor_integrante.cargo,
-                                participacion=mejor_integrante.participacion or "",
-                                tipo_documento="DNI",
-                                numero_documento=dni_correcto
-                            )
-                        except Exception as e:
-                            logger.warning(f"Error corrigiendo DNI para {nombre}: {str(e)}")
-                    else:
-                        logger.info(f"🎯 Seleccionado {nombre} con cargo {mejor_integrante.cargo} y DNI correcto {dni_correcto}")
-                else:
-                    logger.info(f"🎯 Seleccionado {nombre} con cargo {mejor_integrante.cargo} (sin mapeo de DNI)")
+                        logger.info(f"🔧 Corrigiendo DNI para {mejor_integrante.nombre} (mejor cargo: {mejor_integrante.cargo}): {dni_correcto}")
+                        mejor_integrante = self._crear_integrante_corregido(mejor_integrante, dni_correcto)
                 
                 integrantes_finales.append(mejor_integrante)
                 
                 # Log para debugging
                 cargos_encontrados = [f"{i.cargo}(pri:{prioridad_cargos.get(i.cargo, 0)})" for i in lista_integrantes]
-                logger.info(f"🥇 Mejor integrante para {nombre}: {mejor_integrante.cargo} de entre {cargos_encontrados}")
+                logger.info(f"🥇 Mejor integrante para {mejor_integrante.nombre}: {mejor_integrante.cargo} de entre {cargos_encontrados}")
         
-        logger.info(f"Deduplicación completada: {len(integrantes)} -> {len(integrantes_finales)} integrantes")
         return integrantes_finales
+    
+    def _crear_integrante_corregido(self, integrante_original: IntegranteOSCE, dni_correcto: str) -> IntegranteOSCE:
+        """Crea un nuevo integrante con DNI corregido"""
+        try:
+            return IntegranteOSCE(
+                nombre=integrante_original.nombre,
+                cargo=integrante_original.cargo,
+                participacion=integrante_original.participacion or "",
+                tipo_documento="DNI",
+                numero_documento=dni_correcto
+            )
+        except Exception as e:
+            logger.warning(f"Error corrigiendo DNI para {integrante_original.nombre}: {str(e)}")
+            return integrante_original
 
     async def _extraer_representantes_metodo_directo(self, texto_pagina: str):
         """Método directo para extraer representantes usando regex simple"""
