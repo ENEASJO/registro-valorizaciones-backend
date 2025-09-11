@@ -2769,8 +2769,9 @@ class OSCEService:
         mapeo_dni_conocidos = {
             'SILVA SIGUEÑAS JULIO ROGER': '7523236',
             'BLAS BERNACHEA ANDRU STALIN': '71918858',
-            # ✅ Agregamos casos específicos del RUC 20600074114
+            # ✅ Agregamos casos específicos del RUC 20610701117 (VIDA SANA ALEMANA)
             'VERAMENDI ZORRILLA LEVI EDON': '41302182',
+            'VERAMENDI ZORRILLA EVET ABEL': '32303876',
             'DIAZ GARAY EDGARDO NIVARDO': '42137216'
         }
         
