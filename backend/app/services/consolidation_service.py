@@ -273,7 +273,11 @@ class ConsolidationService:
         representantes_sunat = datos_sunat.representantes if datos_sunat else []
         integrantes_oece = datos_oece.integrantes if datos_oece else []
         
-        logger.info(f"   📋 SUNAT: {len(representantes_sunat)} representantes")
+        # Filtrar representantes inválidos de SUNAT
+        representantes_sunat_validos = [r for r in representantes_sunat if self._es_representante_valido(r)]
+        
+        logger.info(f"   📋 SUNAT: {len(representantes_sunat)} representantes brutos")
+        logger.info(f"   ✅ SUNAT: {len(representantes_sunat_validos)} representantes válidos")
         logger.info(f"   📋 OECE: {len(integrantes_oece)} integrantes")
         
         # Crear diccionario de miembros OSCE por DNI para matching rápido
@@ -289,7 +293,7 @@ class ConsolidationService:
         # Procesar representantes de SUNAT
         oece_procesados = set()
         
-        for representante in representantes_sunat:
+        for representante in representantes_sunat_validos:
             miembro_oece_coincidente = None
             metodo_matching = ""
             
@@ -373,6 +377,47 @@ class ConsolidationService:
         nombre_limpio = re.sub(r'\s+', ' ', nombre_limpio)
         
         return nombre_limpio
+    
+    def _es_representante_valido(self, representante: RepresentanteLegal) -> bool:
+        """Verificar si un representante de SUNAT es válido o es un mensaje del sistema"""
+        if not representante or not representante.nombre:
+            return False
+        
+        nombre = representante.nombre.upper().strip()
+        
+        # Lista de patrones inválidos que indican mensajes del sistema, no personas reales
+        patrones_invalidos = [
+            "RESULTADO DE LA BÚSQUEDA",
+            "INFORMACIÓN HISTÓRICA", 
+            "REACTIVA PERÚ",
+            "DEUDA EN COBRANZA COACTIVA",
+            "REPRESENTANTE(S) LEGAL(ES)",
+            "SIN REPRESENTANTES",
+            "NO HAY REPRESENTANTES",
+            "CONSULTA SUNAT",
+            "PÁGINA",
+            "REGISTRO",
+            "TRÁMITES",
+            "ACTIVIDADES"
+        ]
+        
+        # Verificar si el nombre coincide con algún patrón inválido
+        for patron in patrones_invalidos:
+            if patron in nombre:
+                return False
+        
+        # Verificar si el nombre tiene palabras clave de sistema
+        palabras_sistema = ["RESULTADO", "BÚSQUEDA", "HISTÓRICA", "REACTIVA", "DEUDA", "COBRANZA"]
+        for palabra in palabras_sistema:
+            if palabra in nombre:
+                return False
+        
+        # Verificar longitud mínima y caracteres
+        if len(nombre) < 5 or nombre.isnumeric():
+            return False
+        
+        # Si pasó todos los filtros, es válido
+        return True
     
     def _crear_miembro_combinado(
         self, 
