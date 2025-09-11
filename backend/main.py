@@ -527,6 +527,51 @@ async def consultar_ruc_consolidado(ruc: str):
         
         print("✅ Consulta consolidada completada exitosamente")
         
+        # 🔥 NUEVO: Guardar automáticamente en Neon
+        try:
+            from app.services.empresa_service_neon import empresa_service_neon
+            
+            # Preparar datos para guardar en Neon
+            datos_empresa = {
+                'ruc': resultado_consolidado.ruc,
+                'razon_social': resultado_consolidado.razon_social,
+                'email': resultado_consolidado.contacto.email if resultado_consolidado.contacto else "",
+                'telefono': resultado_consolidado.contacto.telefono if resultado_consolidado.contacto else "",
+                'direccion': resultado_consolidado.contacto.direccion if resultado_consolidado.contacto else "",
+                'departamento': resultado_consolidado.contacto.departamento if resultado_consolidado.contacto else "",
+                'provincia': resultado_consolidado.contacto.ciudad if resultado_consolidado.contacto else "",
+                'estado': resultado_consolidado.registro.estado_sunat if resultado_consolidado.registro else "ACTIVO",
+                'datos_sunat': resultado_consolidado.registro.sunat.__dict__ if resultado_consolidado.registro and resultado_consolidado.registro.sunat else {},
+                'datos_osce': resultado_consolidado.registro.osce.__dict__ if resultado_consolidado.registro and resultado_consolidado.registro.osce else {},
+                'fuentes_consultadas': resultado_consolidado.fuentes_consultadas or [],
+                'representantes': [
+                    {
+                        'nombre': miembro.nombre,
+                        'cargo': miembro.cargo,
+                        'tipo_documento': miembro.tipo_documento,
+                        'numero_documento': miembro.numero_documento,
+                        'participacion': miembro.participacion,
+                        'fuente': miembro.fuente
+                    } for miembro in resultado_consolidado.miembros
+                ] if resultado_consolidado.miembros else [],
+                'contactos': [
+                    {
+                        'telefono': resultado_consolidado.contacto.telefono,
+                        'email': resultado_consolidado.contacto.email,
+                        'direccion': resultado_consolidado.contacto.direccion,
+                        'fuente': 'CONSOLIDADO'
+                    }
+                ] if resultado_consolidado.contacto and (resultado_consolidado.contacto.telefono or resultado_consolidado.contacto.email) else []
+            }
+            
+            # Guardar en Neon
+            empresa_id = empresa_service_neon.guardar_empresa(datos_empresa)
+            print(f"✅ Datos guardados en Neon para RUC {ruc}: {empresa_id}")
+            
+        except Exception as e:
+            print(f"⚠️ Error guardando en Neon: {e}")
+            # No interrumpir la consulta si falla el guardado
+        
         # If SUNAT data is missing from consolidation, use fallback
         if not resultado_consolidado.razon_social or not resultado_consolidado.fuentes_consultadas or "SUNAT" not in resultado_consolidado.fuentes_consultadas:
             print("🔄 SUNAT data missing from consolidation, using fallback...")
