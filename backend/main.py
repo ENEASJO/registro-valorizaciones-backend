@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
+import random
 from datetime import datetime
 from typing import Dict, Any
 
@@ -172,18 +173,70 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
                     print("☁️ Usando configuración básica para producción")
             
             page = await browser.new_page(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             )
+            
+            # Estrategias de evasión de detección
+            await page.add_init_script("""
+                // Ocultar propiedades de automatización
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined,
+                });
+                
+                // Simular permisos
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
+                
+                // Simular lenguaje
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['es-PE', 'es', 'en'],
+                });
+                
+                // Simular plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [
+                        {
+                            0: {type: "application/x-google-chrome-pdf"},
+                            description: "Portable Document Format",
+                            filename: "internal-pdf-viewer",
+                            length: 1,
+                            name: "Chrome PDF Plugin"
+                        }
+                    ],
+                });
+            """)
+            
+            # Establecer viewport realista
+            await page.set_viewport_size({
+                "width": 1366,
+                "height": 768
+            })
             
             print("🌐 Navegando a SUNAT...")
             await page.goto("https://e-consultaruc.sunat.gob.pe/cl-ti-itmrconsruc/FrameCriterioBusquedaWeb.jsp", 
-                           timeout=30000)
+                           timeout=45000)
             
-            # Llenar el formulario
-            await page.fill("#txtRuc", ruc)
+            # Esperar aleatoria para simular comportamiento humano
+            await page.wait_for_timeout(random.randint(1000, 3000))
             
-            # Esperar un momento para cargar dinámico
-            await page.wait_for_timeout(1000)
+            # Llenar el formulario de forma más humana
+            print("📝 Llenando formulario...")
+            
+            # Hacer clic en el campo primero para enfocar
+            await page.click("#txtRuc")
+            await page.wait_for_timeout(random.randint(200, 500))
+            
+            # Escribir el RUC carácter por carácter con delays aleatorios
+            for i, char in enumerate(ruc):
+                await page.keyboard.type(char)
+                await page.wait_for_timeout(random.randint(50, 150))
+            
+            # Esperar antes de verificar CAPTCHA
+            await page.wait_for_timeout(random.randint(1000, 2000))
             
             # Verificar si el campo captcha es visible (múltiples posibles IDs)
             captcha_visible = False
@@ -205,14 +258,41 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
             
             # Si hay captcha visible, esto indica que SUNAT está requiriendo verificación
             if captcha_visible:
-                print("⚠️ SUNAT requiere CAPTCHA - no se puede automatizar completamente")
-                # En producción, aquí se podría integrar con un servicio de resolución de CAPTCHA
-                # Por ahora, continuamos sin llenar el captcha para ver el comportamiento
-                print("🔄 Continuando sin resolver CAPTCHA...")
+                print("⚠️ SUNAT requiere CAPTCHA - intentando evasión...")
+                
+                # Estrategia 1: Esperar y recargar la página
+                await page.wait_for_timeout(2000)
+                await page.reload()
+                await page.wait_for_timeout(2000)
+                
+                # Volver a llenar el formulario después de recargar
+                await page.click("#txtRuc")
+                await page.wait_for_timeout(500)
+                await page.fill("#txtRuc", ruc)
+                await page.wait_for_timeout(1000)
+                
+                # Verificar nuevamente si CAPTCHA sigue visible
+                captcha_visible = False
+                for selector in possible_captcha_selectors:
+                    try:
+                        if await page.is_visible(selector, timeout=1000):
+                            captcha_visible = True
+                            break
+                    except:
+                        continue
             
-            # Submit
+            # Submit con movimiento humano
+            print("🔍 Enviando consulta...")
+            
+            # Mover el mouse al botón antes de hacer clic
+            await page.hover("#btnAceptar")
+            await page.wait_for_timeout(random.randint(300, 700))
+            
+            # Hacer clic
             await page.click("#btnAceptar")
-            await page.wait_for_timeout(5000)  # Más tiempo para cargar resultados
+            
+            # Esperar más tiempo para que cargue la página de resultados
+            await page.wait_for_timeout(random.randint(5000, 8000))
             
             # Extraer datos básicos con debugging mejorado
             try:
@@ -224,11 +304,20 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
                 print(f"📄 URL actual: {page_url}")
                 print(f"📄 Título de página: {page_title}")
                 
-                # Verificar contenido básico sin bloquear por "Resultado de la Búsqueda"
-                # Esta sección puede no existir pero los datos sí están presentes
+                # Verificar si hay CAPTCHA en la página
                 page_content = await page.content()
-                if "captcha" in page_content.lower() or "código" in page_content.lower():
-                    print("🔐 Posible CAPTCHA detectado en la página")
+                if "captcha" in page_content.lower() or "código" in page_content.lower() or "Ingrese el código" in page_content:
+                    print("🔐 CAPTCHA detectado en la página de resultados")
+                    
+                    # Estrategia adicional: intentar acceder directamente al resultado
+                    if "FrameCriterioBusquedaWeb.jsp" in page_url:
+                        print("🔄 Volviendo a intentar con enfoque diferente...")
+                        await page.goto("https://e-consultaruc.sunat.gob.pe/cl-ti-itmrconsruc/jcrS00Alias", timeout=30000)
+                        await page.wait_for_timeout(3000)
+                        await page.fill("#txtRuc", ruc)
+                        await page.wait_for_timeout(1000)
+                        await page.click("#btnAceptar")
+                        await page.wait_for_timeout(5000)
                 else:
                     print("✅ Página cargada, procediendo con extracción")
                 
