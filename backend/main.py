@@ -1057,3 +1057,46 @@ async def test_consolidacion_mejorada(ruc_input: RUCInput):
 #             "error": str(e),
 #             "timestamp": datetime.now().isoformat()
 #         }
+
+# Endpoint temporal para ejecutar esquema SQL (eliminar después de usar)
+@app.post("/ejecutar-esquema-temporal")
+async def ejecutar_esquema_temporal():
+    """Endpoint temporal para ejecutar el esquema SQL de Neon"""
+    try:
+        from app.services.empresa_service_neon import empresa_service_neon
+        
+        # Leer el esquema SQL
+        import os
+        schema_path = os.path.join(os.path.dirname(__file__), 'sql', 'empresas_schema.sql')
+        
+        with open(schema_path, 'r', encoding='utf-8') as f:
+            schema_sql = f.read()
+        
+        # Dividir el esquema en instrucciones individuales
+        statements = [stmt.strip() for stmt in schema_sql.split(';') if stmt.strip() and not stmt.strip().startswith('--')]
+        
+        # Ejecutar cada instrucción
+        resultados = []
+        for i, statement in enumerate(statements):
+            try:
+                # Usar el servicio de Neon para ejecutar la instrucción
+                # Esto es un workaround - normalmente usaríamos execute_raw directamente
+                result = empresa_service_neon._execute_query(statement + ';')
+                resultados.append(f"✅ Instrucción {i+1}: Ejecutada correctamente")
+            except Exception as e:
+                resultados.append(f"⚠️  Instrucción {i+1}: {str(e)}")
+        
+        return {
+            "success": True,
+            "message": "Esquema ejecutado (parcialmente)",
+            "resultados": resultados,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Error ejecutando esquema: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
