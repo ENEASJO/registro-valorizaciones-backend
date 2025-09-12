@@ -17,7 +17,7 @@ from app.models.empresa import (
     RepresentanteResponse
 )
 
-router = APIRouter(prefix="/api/empresas", tags=["empresas"])
+router = APIRouter(prefix="/empresas", tags=["empresas"])
 
 # Servicio Neon se importará bajo demanda (lazy loading)
 def get_empresa_service():
