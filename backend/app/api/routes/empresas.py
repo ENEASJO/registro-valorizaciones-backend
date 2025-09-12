@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from app.services.empresa_service_neon import empresa_service_neon
+# Lazy import para evitar problemas de importación circular
 from app.models.empresa import (
     EmpresaCreateSchema,
     EmpresaResponse,
@@ -19,8 +19,11 @@ from app.models.empresa import (
 
 router = APIRouter(prefix="/api/empresas", tags=["empresas"])
 
-# Instancia del servicio Neon
-empresa_service = empresa_service_neon
+# Servicio Neon se importará bajo demanda (lazy loading)
+def get_empresa_service():
+    """Obtener instancia del servicio de Neon de forma lazy"""
+    from app.services.empresa_service_neon import empresa_service_neon
+    return empresa_service_neon
 
 def validar_ruc(ruc: str) -> bool:
     """Validar formato de RUC"""
@@ -78,7 +81,8 @@ async def crear_empresa(
             )
         
         # Verificar si ya existe (usando servicio Neon)
-        empresa_existente = empresa_service_neon.obtener_empresa_por_ruc(empresa_data.ruc)
+        empresa_service = get_empresa_service()
+        empresa_existente = empresa_service.obtener_empresa_por_ruc(empresa_data.ruc)
         if empresa_existente:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -120,7 +124,6 @@ async def crear_empresa(
         }
         
         # CAMBIO: Crear empresa en Neon PostgreSQL
-        from app.services.empresa_service_neon import empresa_service_neon
         
         # Preparar datos para Neon
         empresa_data_neon = {
@@ -136,7 +139,8 @@ async def crear_empresa(
             'categoria_contratista': empresa_data.categoria_contratista
         }
         
-        empresa_id = empresa_service_neon.guardar_empresa(empresa_data_neon)
+        empresa_service = get_empresa_service()
+        empresa_id = empresa_service.guardar_empresa(empresa_data_neon)
         
         if not empresa_id:
             raise HTTPException(
@@ -145,7 +149,7 @@ async def crear_empresa(
             )
         
         # Obtener empresa creada para retornar
-        empresa_creada = empresa_service_neon.obtener_empresa_por_ruc(empresa_data.ruc)
+        empresa_creada = empresa_service.obtener_empresa_por_ruc(empresa_data.ruc)
         if not empresa_creada:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -169,7 +173,7 @@ async def obtener_empresa(
     """Obtener empresa por ID usando Turso"""
     try:
         # Buscar empresa por ID (usando servicio Neon)
-        empresas = empresa_service_neon.listar_empresas(limit=1000)
+        empresas = get_empresa_service().listar_empresas(limit=1000)
         empresa = next((e for e in empresas if e.get('id') == str(empresa_id)), None)
         
         if not empresa:
@@ -200,7 +204,7 @@ async def obtener_empresa_por_ruc(
                 detail="RUC inválido"
             )
         
-        empresa = empresa_service_neon.obtener_empresa_por_ruc(ruc)
+        empresa = get_empresa_service().obtener_empresa_por_ruc(ruc)
         
         if not empresa:
             raise HTTPException(
@@ -232,9 +236,8 @@ async def listar_empresas(
         offset = (page - 1) * per_page
         
         # CAMBIO: Usar Neon en lugar de Turso
-        from app.services.empresa_service_neon import empresa_service_neon
         
-        empresas_raw = empresa_service_neon.listar_empresas(limit=per_page * 5)
+        empresas_raw = get_empresa_service().listar_empresas(limit=per_page * 5)
         
         # Filtrar por búsqueda si se especifica
         if search:
@@ -306,9 +309,8 @@ async def eliminar_empresa(
         logger.info(f"🗑️ [ROUTER] Recibida petición DELETE para empresa: {empresa_id}")
         
         # FIJO: Usar el mismo servicio que usa GET/LIST (Neon PostgreSQL)
-        from app.services.empresa_service_neon import empresa_service_neon
         
-        resultado = empresa_service_neon.eliminar_empresa(empresa_id)
+        resultado = get_empresa_service().eliminar_empresa(empresa_id)
         
         if not resultado:
             logger.warning(f"❌ [ROUTER] Empresa no encontrada: {empresa_id}")
@@ -342,7 +344,7 @@ async def obtener_representantes_empresa(
     """Obtener solo los representantes de una empresa usando Turso"""
     try:
         # Buscar empresa por ID (usando servicio Neon)
-        empresas = empresa_service_neon.listar_empresas(limit=1000)
+        empresas = get_empresa_service().listar_empresas(limit=1000)
         empresa = next((e for e in empresas if e.get('id') == str(empresa_id)), None)
         
         if not empresa:
@@ -403,7 +405,7 @@ async def validar_ruc_endpoint(
                 "message": "RUC inválido. Debe tener 11 dígitos y comenzar con 10 o 20"
             }
         
-        empresa_existente = empresa_service_neon.obtener_empresa_por_ruc(ruc)
+        empresa_existente = get_empresa_service().obtener_empresa_por_ruc(ruc)
         
         return {
             "success": True,
@@ -438,9 +440,8 @@ async def listar_empresas_ejecutoras(
         offset = (page - 1) * per_page
         
         # Usar Neon PostgreSQL
-        from app.services.empresa_service_neon import empresa_service_neon
         
-        empresas_raw = empresa_service_neon.listar_empresas(limit=per_page * 5)
+        empresas_raw = get_empresa_service().listar_empresas(limit=per_page * 5)
         
         # Filtrar por categoría EJECUTORA
         empresas_raw = [emp for emp in empresas_raw if emp.get('categoria_contratista') == 'EJECUTORA']
@@ -493,9 +494,8 @@ async def listar_empresas_supervisoras(
         offset = (page - 1) * per_page
         
         # Usar Neon PostgreSQL
-        from app.services.empresa_service_neon import empresa_service_neon
         
-        empresas_raw = empresa_service_neon.listar_empresas(limit=per_page * 5)
+        empresas_raw = get_empresa_service().listar_empresas(limit=per_page * 5)
         
         # Filtrar por categoría SUPERVISORA
         empresas_raw = [emp for emp in empresas_raw if emp.get('categoria_contratista') == 'SUPERVISORA']
@@ -542,7 +542,7 @@ async def obtener_estadisticas_empresas():
     """Obtener estadísticas generales de empresas usando Turso"""
     try:
         # Obtener estadísticas directamente del servicio Neon
-        stats = empresa_service_neon.get_stats()
+        stats = get_empresa_service().get_stats()
         
         if "error" in stats:
             raise HTTPException(
@@ -551,7 +551,7 @@ async def obtener_estadisticas_empresas():
             )
         
         # Obtener algunas empresas para análisis adicional (usando servicio Neon)
-        empresas = empresa_service_neon.listar_empresas(limit=1000)
+        empresas = get_empresa_service().listar_empresas(limit=1000)
         
         # Estadísticas por tipo
         tipos = {}
