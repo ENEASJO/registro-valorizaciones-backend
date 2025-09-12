@@ -77,8 +77,8 @@ async def crear_empresa(
                 detail="RUC inválido. Debe tener 11 dígitos y comenzar con 10 o 20"
             )
         
-        # Verificar si ya existe
-        empresa_existente = empresa_service.get_empresa_by_ruc(empresa_data.ruc)
+        # Verificar si ya existe (usando servicio Neon)
+        empresa_existente = empresa_service_neon.obtener_empresa_por_ruc(empresa_data.ruc)
         if empresa_existente:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -168,10 +168,9 @@ async def obtener_empresa(
 ):
     """Obtener empresa por ID usando Turso"""
     try:
-        # Por ahora, listar todas y filtrar por ID
-        # En una implementación más completa se haría una consulta directa por ID
-        empresas = empresa_service.list_empresas(limit=1000)
-        empresa = next((e for e in empresas if e.get('id') == empresa_id), None)
+        # Buscar empresa por ID (usando servicio Neon)
+        empresas = empresa_service_neon.listar_empresas(limit=1000)
+        empresa = next((e for e in empresas if e.get('id') == str(empresa_id)), None)
         
         if not empresa:
             raise HTTPException(
@@ -201,7 +200,7 @@ async def obtener_empresa_por_ruc(
                 detail="RUC inválido"
             )
         
-        empresa = empresa_service.get_empresa_by_ruc(ruc)
+        empresa = empresa_service_neon.obtener_empresa_por_ruc(ruc)
         
         if not empresa:
             raise HTTPException(
@@ -342,9 +341,9 @@ async def obtener_representantes_empresa(
 ):
     """Obtener solo los representantes de una empresa usando Turso"""
     try:
-        # Buscar empresa por ID
-        empresas = empresa_service.list_empresas(limit=1000)
-        empresa = next((e for e in empresas if e.get('id') == empresa_id), None)
+        # Buscar empresa por ID (usando servicio Neon)
+        empresas = empresa_service_neon.listar_empresas(limit=1000)
+        empresa = next((e for e in empresas if e.get('id') == str(empresa_id)), None)
         
         if not empresa:
             raise HTTPException(
@@ -404,7 +403,7 @@ async def validar_ruc_endpoint(
                 "message": "RUC inválido. Debe tener 11 dígitos y comenzar con 10 o 20"
             }
         
-        empresa_existente = empresa_service.get_empresa_by_ruc(ruc)
+        empresa_existente = empresa_service_neon.obtener_empresa_por_ruc(ruc)
         
         return {
             "success": True,
@@ -542,8 +541,8 @@ async def listar_empresas_supervisoras(
 async def obtener_estadisticas_empresas():
     """Obtener estadísticas generales de empresas usando Turso"""
     try:
-        # Obtener estadísticas directamente del servicio
-        stats = empresa_service.get_stats()
+        # Obtener estadísticas directamente del servicio Neon
+        stats = empresa_service_neon.get_stats()
         
         if "error" in stats:
             raise HTTPException(
@@ -551,8 +550,8 @@ async def obtener_estadisticas_empresas():
                 detail=f"Error obteniendo estadísticas: {stats['error']}"
             )
         
-        # Obtener algunas empresas para análisis adicional
-        empresas = empresa_service.list_empresas(limit=1000)
+        # Obtener algunas empresas para análisis adicional (usando servicio Neon)
+        empresas = empresa_service_neon.listar_empresas(limit=1000)
         
         # Estadísticas por tipo
         tipos = {}
