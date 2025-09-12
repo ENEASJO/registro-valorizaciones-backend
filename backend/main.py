@@ -722,78 +722,6 @@ async def listar_empresas():
                 }
 """
 
-@app.post("/api/empresas")
-async def crear_empresa(data: dict):
-    # Docstring convertido a comentario
-    print(f"📝 Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
-    
-    try:
-        # Usar el servicio de Neon
-        from app.services.empresa_service_neon import empresa_service_neon
-        
-        empresa_id = empresa_service_neon.guardar_empresa(data)
-        
-        if empresa_id:
-            print(f"✅ Empresa guardada en Neon con ID: {empresa_id}")
-            return {
-                "success": True,
-                "data": {"id": empresa_id, **data},
-                "message": "Empresa guardada exitosamente en Neon PostgreSQL",
-                "timestamp": datetime.now().isoformat()
-            }
-        else:
-            print("⚠️ Neon falló, saltando Supabase (deshabilitado)...")
-            # # Fallback a Supabase si falla Neon - DESHABILITADO
-            # try:
-            #         return {
-            #             "success": True,
-            #             "message": "Empresa guardada en Supabase (Neon no disponible)",
-            #             "timestamp": datetime.now().isoformat()
-            #         }
-            
-            # Último fallback a Turso
-            try:
-                from app.services.empresa_service_simple import empresa_service_simple
-                turso_id = empresa_service_simple.guardar_empresa(data)
-                if turso_id:
-                    return {
-                        "success": True,
-                        "data": {"id": turso_id, **data},
-                        "message": "Empresa guardada en Turso (Neon y Supabase fallaron)",
-                        "timestamp": datetime.now().isoformat()
-                    }
-            except Exception as turso_error:
-                print(f"❌ Turso fallback también falló: {turso_error}")
-            
-            return {
-                "success": True,
-                "data": {"id": 999, **data},  # ID temporal
-                "message": "Empresa guardada temporalmente (todas las bases fallaron)",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-    except Exception as e:
-        print(f"❌ Error guardando en Supabase: {e}")
-        # Fallback a Turso
-        try:
-            from app.services.empresa_service_simple import empresa_service_simple
-            turso_id = empresa_service_simple.guardar_empresa(data)
-            if turso_id:
-                return {
-                    "success": True,
-                    "data": {"id": turso_id, **data},
-                    "message": f"Empresa guardada en Turso (Supabase error: {str(e)})",
-                    "timestamp": datetime.now().isoformat()
-                }
-        except Exception as turso_error:
-            print(f"❌ Turso fallback falló: {turso_error}")
-        
-        return {
-            "success": True,
-            "data": {"id": 998, **data},  # ID de error
-            "message": f"Empresa guardada localmente (ambas bases fallaron)",
-            "timestamp": datetime.now().isoformat()
-        }
 
 @app.get("/obras")
 async def listar_obras():
@@ -831,38 +759,6 @@ async def crear_valorizacion(data: dict):
         "timestamp": datetime.now().isoformat()
     }
 
-@app.get("/api/empresas")
-async def listar_empresas_directo():
-    # GET directo para /api/empresas - usa Neon PostgreSQL
-    try:
-        from app.services.empresa_service_neon import empresa_service_neon
-        
-        empresas = empresa_service_neon.listar_empresas(limit=50)
-        
-        print(f"✅ [GET DIRECTO] Encontradas {len(empresas)} empresas en Neon")
-        return {
-            "success": True,
-            "data": empresas,  # ARREGLO: data debe ser directamente el array
-            "total": len(empresas),
-            "page": 1,
-            "per_page": 50,
-            "total_pages": 1,
-            "message": f"Se encontraron {len(empresas)} empresa(s)",
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        print(f"❌ [GET DIRECTO] Error listando empresas: {e}")
-        return {
-            "success": False,
-            "data": [],  # ARREGLO: data debe ser directamente el array vacío
-            "total": 0,
-            "page": 1,
-            "per_page": 50,
-            "total_pages": 0,
-            "message": f"Error obteniendo empresas: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        }
 
 # ELIMINADO: Endpoint DELETE duplicado para evitar conflictos con el router
 
@@ -891,25 +787,6 @@ class EmpresaCreate(BaseModel):
     representante_legal: str = None
     estado: str = "ACTIVO"
 
-@app.post("/api/v1/empresas")
-async def crear_empresa_temporal(empresa: EmpresaCreate):
-    # Docstring convertido a comentario
-    print(f"📝 Recibiendo empresa temporal: {empresa.ruc} - {empresa.razon_social}")
-    
-    # Cargar routers si no están cargados
-    ensure_routers_loaded()
-    
-    # Por ahora retornamos éxito temporal con los datos recibidos
-    return {
-        "success": True,
-        "data": {
-            "id": 999,  # ID temporal
-            "codigo": f"EMP{empresa.ruc[:6]}",
-            **empresa.dict()
-        },
-        "message": "Empresa guardada temporalmente (esperando router completo)",
-        "timestamp": datetime.now().isoformat()
-    }
 
 # ELIMINADO: Endpoint DELETE temporal duplicado - usar solo el del router
 
