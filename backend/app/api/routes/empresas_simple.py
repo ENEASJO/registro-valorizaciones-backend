@@ -109,11 +109,20 @@ async def crear_empresa(empresa_data: Dict[str, Any]):
         # Crear empresa
         empresa_id = empresa_service.guardar_empresa(empresa_data)
         
-        if not empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error creando empresa en la base de datos"
-            )
+        if not empresa_id or empresa_id == "neon-success":
+            # Verificar si la empresa fue creada a pesar de no recibir ID
+            empresa_creada = empresa_service.obtener_empresa_por_ruc(ruc)
+            if empresa_creada:
+                return {
+                    "success": True,
+                    "data": empresa_creada,
+                    "message": "Empresa creada correctamente"
+                }
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Error creando empresa en la base de datos"
+                )
         
         # Obtener empresa creada
         empresa_creada = empresa_service.obtener_empresa_por_ruc(ruc)
