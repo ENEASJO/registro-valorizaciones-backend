@@ -1,5 +1,5 @@
 # main.py - Versión con inicio rápido y Playwright lazy
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -34,6 +34,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Middleware para manejar headers de proxy (Cloud Run)
+# Habilitar automáticamente en entornos de producción (Cloud Run)
+enable_proxy_middleware = os.environ.get('ENABLE_PROXY_MIDDLEWARE', 'true').lower() == 'true'
+if enable_proxy_middleware:
+    try:
+        from app.middleware.proxy_headers import ProxyHeadersMiddleware
+        app.add_middleware(ProxyHeadersMiddleware)
+        print("✅ Proxy headers middleware configurado para Cloud Run")
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar middleware de proxy headers: {e}")
+else:
+    print("ℹ️ Proxy headers middleware deshabilitado")
 
 # Evento de startup
 @app.on_event("startup")
@@ -80,6 +93,21 @@ async def health():
         "status": "healthy",
         "fast_startup": True,
         "playwright": "lazy_loaded"
+    }
+
+@app.get("/debug/headers")
+async def debug_headers(request: Request):
+    """Debug endpoint to check headers and proxy handling"""
+    return {
+        "url": str(request.url),
+        "scheme": request.url.scheme,
+        "headers": dict(request.headers),
+        "client": {
+            "host": request.client.host if request.client else None,
+            "port": request.client.port if request.client else None
+        },
+        "scope_scheme": request.scope.get("scheme"),
+        "proxy_handled": request.headers.get("x-proxy-handled") == "true"
     }
 
 # Modelo para RUC

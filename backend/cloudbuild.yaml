@@ -28,6 +28,7 @@ steps:
     - '--set-env-vars=HOST=0.0.0.0'
     - '--set-env-vars=PORT=8080'
     - '--set-env-vars=NEON_CONNECTION_STRING=postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+    - '--set-env-vars=ENABLE_PROXY_MIDDLEWARE=true'
 
 images:
   - 'gcr.io/$PROJECT_ID/registro-valorizaciones:$COMMIT_SHA'
