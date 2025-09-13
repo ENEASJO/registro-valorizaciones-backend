@@ -3,6 +3,7 @@ Middleware to handle proxy headers in Cloud Run environment
 Fixes HTTPS redirect issues by properly handling X-Forwarded headers
 """
 
+import os
 from typing import Dict, Any
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -75,8 +76,9 @@ class ProxyHeadersMiddleware(BaseHTTPMiddleware):
         # Process the request
         response = await call_next(request)
         
-        # Add header to indicate proxy handling
-        response.headers["x-proxy-handled"] = "true"
+        # Add header to indicate proxy handling (solo en desarrollo para no interferir con CORS)
+        if not os.environ.get('PRODUCTION', 'false').lower() == 'true':
+            response.headers["x-proxy-handled"] = "true"
         
         return response
 

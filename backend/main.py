@@ -26,16 +26,7 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
-# CORS básico
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Middleware para manejar headers de proxy (Cloud Run)
+# Middleware para manejar headers de proxy (Cloud Run) - DEBE ESTAR ANTES DE CORS
 # Temporalmente desactivado para solucionar error 500
 enable_proxy_middleware = os.environ.get('ENABLE_PROXY_MIDDLEWARE', 'true').lower() == 'true'
 if enable_proxy_middleware:
@@ -47,6 +38,15 @@ if enable_proxy_middleware:
         print(f"⚠️ No se pudo cargar middleware de proxy headers: {e}")
 else:
     print("ℹ️ Proxy headers middleware deshabilitado")
+
+# CORS básico - DEBE ESTAR DESPUÉS DEL MIDDLEWARE DE PROXY
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Evento de startup
 @app.on_event("startup")
