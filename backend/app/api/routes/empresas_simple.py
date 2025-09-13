@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/empresas", tags=["empresas"])
+router = APIRouter(prefix="/api/empresas", tags=["empresas"])
 
 # Servicio Neon se importará bajo demanda (lazy loading)
 def get_empresa_service():
