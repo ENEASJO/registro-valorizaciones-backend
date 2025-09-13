@@ -28,7 +28,7 @@ except Exception as e:
 
 # Middleware para manejar headers de proxy (Cloud Run) - DEBE ESTAR ANTES DE CORS
 # Temporalmente desactivado para solucionar error 500
-enable_proxy_middleware = os.environ.get('ENABLE_PROXY_MIDDLEWARE', 'true').lower() == 'true'
+enable_proxy_middleware = os.environ.get('ENABLE_PROXY_MIDDLEWARE', 'false').lower() == 'true'
 if enable_proxy_middleware:
     try:
         from app.middleware.proxy_headers import ProxyHeadersMiddleware
