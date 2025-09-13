@@ -17,11 +17,17 @@ class EmpresaServiceNeon:
     
     def __init__(self):
         # Connection string de Neon
-        self.connection_string = os.getenv(
-            "NEON_CONNECTION_STRING", 
-            "postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk-pooler.sa-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require"
-        )
+        env_connection_string = os.getenv("NEON_CONNECTION_STRING")
         
+        # Validar que la conexión no tenga formato inválido
+        if env_connection_string and not env_connection_string.startswith("postgresql://"):
+            logger.warning(f"⚠️ NEON_CONNECTION_STRING tiene formato inválido: {env_connection_string[:50]}...")
+            logger.warning("🔄 Usando cadena de conexión por defecto")
+            env_connection_string = None
+        
+        self.connection_string = env_connection_string or "postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk-pooler.sa-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require"
+        
+        logger.info(f"🔗 Usando conexión: {self.connection_string[:50]}...")
         self._verificar_conexion()
     
     def _get_connection(self):
