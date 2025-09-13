@@ -15,36 +15,16 @@ app = FastAPI(
     version="4.2.1"
 )
 
-# Lazy loading de routers para evitar errores de importación al inicio
-def setup_routers():
-    # Docstring convertido a comentario
-    try:
-        print("📦 Intentando cargar router de empresas...")
-        from app.api.routes.empresas import router as empresas_router
-        app.include_router(empresas_router)
-        print("✅ Router de empresas cargado exitosamente")
-        print(f"📋 Rutas registradas: {[route.path for route in empresas_router.routes]}")
-        return True
-    except ImportError as e:
-        print(f"⚠️ No se pudo cargar router de empresas (ImportError): {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-    except Exception as e:
-        print(f"❌ Error inesperado cargando router de empresas: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-# Variable para controlar si los routers ya fueron cargados
-_routers_loaded = False
-
-def ensure_routers_loaded():
-    # Docstring convertido a comentario
-    global _routers_loaded
-    if not _routers_loaded:
-        setup_routers()
-        _routers_loaded = True
+# Cargar router de empresas simplificado
+try:
+    print("📦 Cargando router de empresas simplificado...")
+    from app.api.routes.empresas_simple import router as empresas_router
+    app.include_router(empresas_router)
+    print("✅ Router de empresas simplificado cargado exitosamente")
+except Exception as e:
+    print(f"❌ Error cargando router de empresas simplificado: {e}")
+    import traceback
+    traceback.print_exc()
 
 # CORS básico
 app.add_middleware(
@@ -55,20 +35,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Cargar routers al startup
+# Evento de startup
 @app.on_event("startup")
 async def startup_event():
     # Docstring convertido a comentario
     try:
         print("🚀 Iniciando aplicación FastAPI...")
-        ensure_routers_loaded()
         print("✅ Startup completado exitosamente")
     except Exception as e:
         print(f"❌ Error crítico en startup: {e}")
         import traceback
         traceback.print_exc()
-        # No raise el error para permitir que el contenedor inicie
-        print("⚠️ Continuando sin routers cargados...")
 
 # Variable global para Playwright helper (lazy loading)
 _playwright_helper = None
