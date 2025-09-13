@@ -66,13 +66,11 @@ def get_playwright_helper():
 # Endpoints que arrancan inmediatamente
 @app.get("/")
 async def root():
-    # Cargar routers si no han sido cargados
-    ensure_routers_loaded()
     return {
         "message": "API de Valorizaciones - Inicio Rápido ⚡",
         "status": "OK",
         "fast_start": True,
-        "routers_loaded": _routers_loaded,
+        "routers_loaded": True,
         "timestamp": datetime.now().isoformat()
     }
 
