@@ -13,12 +13,11 @@ import urllib.parse
 
 class ProxyHeadersMiddleware(BaseHTTPMiddleware):
     """
-    Middleware to handle proxy headers and fix scheme issues in Cloud Run
+    Simplified middleware to handle proxy headers in Cloud Run
     
     This middleware:
-    1. Detects X-Forwarded-Proto header and updates request.url.scheme
-    2. Handles X-Forwarded-Host and X-Forwarded-Port
-    3. Prevents HTTPS redirect loops in proxy environments
+    1. Detects X-Forwarded-Proto header and updates request scheme
+    2. Prevents HTTPS redirect loops in proxy environments
     """
     
     def __init__(self, app):
@@ -28,59 +27,23 @@ class ProxyHeadersMiddleware(BaseHTTPMiddleware):
         """
         Process request and handle proxy headers
         """
-        # Store original headers for debugging
-        original_scheme = request.url.scheme
-        forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
-        forwarded_host = request.headers.get("x-forwarded-host", "")
-        forwarded_port = request.headers.get("x-forwarded-port", "")
-        
-        # Update request scheme based on X-Forwarded-Proto
-        if forwarded_proto in ("https", "http"):
-            # This is the key fix - update the perceived scheme
-            request.scope["scheme"] = forwarded_proto
-        
-        # Update host if forwarded
-        if forwarded_host:
-            # Parse the original URL components
-            parsed_url = urllib.parse.urlparse(str(request.url))
+        try:
+            # Only handle X-Forwarded-Proto for HTTPS redirects
+            forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
             
-            # Reconstruct the URL with the forwarded host
-            new_netloc = forwarded_host
-            if forwarded_port and forwarded_port != ("443" if forwarded_proto == "https" else "80"):
-                new_netloc += f":{forwarded_port}"
+            # Update request scheme based on X-Forwarded-Proto
+            if forwarded_proto == "https":
+                request.scope["scheme"] = "https"
             
-            # Update the request URL components
-            new_url = parsed_url._replace(
-                scheme=forwarded_proto,
-                netloc=new_netloc
-            )
+            # Process the request
+            response = await call_next(request)
             
-            # Update the request scope
-            request.scope["path"] = new_url.path
-            request.scope["query_string"] = new_url.query.encode()
-            request.scope["headers"] = [
-                (k.encode(), v.encode()) 
-                for k, v in request.headers.items()
-                if k.lower() not in ["host", "x-forwarded-host", "x-forwarded-port", "x-forwarded-proto"]
-            ] + [
-                (b"host", forwarded_host.encode()),
-                (b"x-forwarded-host", forwarded_host.encode()),
-                (b"x-forwarded-port", forwarded_port.encode()),
-                (b"x-forwarded-proto", forwarded_proto.encode()),
-            ]
-        
-        # Add debugging headers (remove in production)
-        request.headers["x-original-scheme"] = original_scheme
-        request.headers["x-detected-scheme"] = forwarded_proto or original_scheme
-        
-        # Process the request
-        response = await call_next(request)
-        
-        # Add header to indicate proxy handling (solo en desarrollo para no interferir con CORS)
-        if not os.environ.get('PRODUCTION', 'false').lower() == 'true':
-            response.headers["x-proxy-handled"] = "true"
-        
-        return response
+            return response
+            
+        except Exception as e:
+            # If middleware fails, continue without proxy handling
+            print(f"⚠️ Proxy headers middleware error: {e}")
+            return await call_next(request)
 
 
 class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
