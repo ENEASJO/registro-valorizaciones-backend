@@ -106,7 +106,7 @@ async def crear_empresa(
         if empresa_existente:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Ya existe una empresa con este RUC"
+                detail=f"Ya existe una empresa con RUC {empresa_data.ruc}. Por favor, busque la empresa existente o actualícela si es necesario."
             )
         
         # Validar que tenga al menos un representante
