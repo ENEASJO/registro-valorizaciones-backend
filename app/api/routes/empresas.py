@@ -36,7 +36,27 @@ def validar_ruc(ruc: str) -> bool:
     return True
 
 def convertir_empresa_dict_a_response(empresa_dict: Dict[str, Any]) -> EmpresaResponse:
-    """Convertir diccionario de empresa de Turso a EmpresaResponse"""
+    """Convertir diccionario de empresa de Neon a EmpresaResponse"""
+
+    # Obtener representantes del diccionario o inicializar vacío
+    representantes = empresa_dict.get('representantes', [])
+    representantes_response = []
+
+    for rep in representantes:
+        representantes_response.append(RepresentanteResponse(
+            id=rep.get('id', 0),
+            nombre=rep.get('nombre', ''),
+            cargo=rep.get('cargo', ''),
+            numero_documento=rep.get('numero_documento', ''),
+            tipo_documento=rep.get('tipo_documento', 'DNI'),
+            fuente=rep.get('fuente'),
+            participacion=rep.get('participacion'),
+            fecha_desde=datetime.fromisoformat(rep.get('fecha_desde', datetime.now().isoformat())) if rep.get('fecha_desde') else None,
+            es_principal=rep.get('es_principal', False),
+            estado=rep.get('estado', 'ACTIVO'),
+            created_at=datetime.fromisoformat(rep.get('created_at', datetime.now().isoformat()))
+        ))
+
     return EmpresaResponse(
         id=empresa_dict.get('id', 0),
         codigo=empresa_dict.get('codigo', ''),
@@ -53,8 +73,8 @@ def convertir_empresa_dict_a_response(empresa_dict: Dict[str, Any]) -> EmpresaRe
         tipo_empresa=empresa_dict.get('tipo_empresa', 'SAC'),
         categoria_contratista=empresa_dict.get('categoria_contratista'),
         especialidades=empresa_dict.get('especialidades', []),
-        representantes=[],  # Por ahora vacío, se puede extender
-        total_representantes=0,
+        representantes=representantes_response,
+        total_representantes=len(representantes_response),
         activo=bool(empresa_dict.get('activo', True)),
         created_at=datetime.fromisoformat(empresa_dict.get('created_at', datetime.now().isoformat())),
         updated_at=datetime.fromisoformat(empresa_dict.get('updated_at', datetime.now().isoformat()))
@@ -141,21 +161,60 @@ async def crear_empresa(
         
         empresa_service = get_empresa_service()
         empresa_id = empresa_service.guardar_empresa(empresa_data_neon)
-        
+
         if not empresa_id:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error creando empresa en la base de datos"
             )
-        
-        # Obtener empresa creada para retornar
+
+        # Guardar TODOS los representantes en la tabla representantes_legales
+        representantes_guardados = []
+        for i, representante in enumerate(empresa_data.representantes):
+            # Preparar datos del representante para guardar_representante
+            representante_data = {
+                'nombre': representante.nombre,
+                'cargo': representante.cargo,
+                'tipo_documento': representante.tipo_documento,
+                'numero_documento': representante.numero_documento,
+                'participacion': representante.participacion if hasattr(representante, 'participacion') else None,
+                'fuente': representante.fuente or 'MANUAL',
+                'es_principal': i == empresa_data.representante_principal_id,
+                'activo': representante.activo if hasattr(representante, 'activo') else True
+            }
+
+            # Guardar el representante
+            representante_id = empresa_service.guardar_representante(empresa_id, representante_data)
+
+            if representante_id:
+                representantes_guardados.append({
+                    'id': representante_id,
+                    'nombre': representante.nombre,
+                    'cargo': representante.cargo,
+                    'numero_documento': representante.numero_documento,
+                    'tipo_documento': representante.tipo_documento,
+                    'fuente': representante.fuente,
+                    'es_principal': i == empresa_data.representante_principal_id,
+                    'activo': representante.activo if hasattr(representante, 'activo') else True,
+                    'created_at': datetime.now()
+                })
+                logger.info(f"✅ Representante guardado: {representante.nombre} para empresa {empresa_id}")
+            else:
+                logger.error(f"❌ Error guardando representante: {representante.nombre}")
+
+        # Obtener empresa creada con todos sus representantes para retornar
         empresa_creada = empresa_service.obtener_empresa_por_ruc(empresa_data.ruc)
         if not empresa_creada:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error obteniendo empresa creada"
             )
-        
+
+        # Asegurar que la respuesta incluya todos los representantes guardados
+        if representantes_guardados:
+            empresa_creada['representantes'] = representantes_guardados
+            empresa_creada['total_representantes'] = len(representantes_guardados)
+
         return convertir_empresa_dict_a_response(empresa_creada)
         
     except HTTPException:

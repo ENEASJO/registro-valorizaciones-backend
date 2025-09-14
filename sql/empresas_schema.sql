@@ -42,10 +42,12 @@ CREATE TABLE IF NOT EXISTS representantes_legales (
     numero_documento VARCHAR(50),
     participacion VARCHAR(100),
     fuente VARCHAR(50) DEFAULT 'SUNAT',
-    
+    es_principal BOOLEAN DEFAULT false,
+    activo BOOLEAN DEFAULT true,
+
     -- Metadatos
     creado_en TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    
+
     -- Índices
     CONSTRAINT documento_valido CHECK (numero_documento IS NULL OR LENGTH(numero_documento) > 0)
 );
@@ -131,20 +133,22 @@ CREATE OR REPLACE FUNCTION insertar_representante_legal(
     p_tipo_documento VARCHAR(50) DEFAULT 'DNI',
     p_numero_documento VARCHAR(50) DEFAULT NULL,
     p_participacion VARCHAR(100) DEFAULT NULL,
-    p_fuente VARCHAR(50) DEFAULT 'SUNAT'
+    p_fuente VARCHAR(50) DEFAULT 'SUNAT',
+    p_es_principal BOOLEAN DEFAULT false,
+    p_activo BOOLEAN DEFAULT true
 )
 RETURNS UUID AS $$
 DECLARE
     v_representante_id UUID;
 BEGIN
     INSERT INTO representantes_legales (
-        empresa_id, nombre, cargo, tipo_documento, 
-        numero_documento, participacion, fuente
+        empresa_id, nombre, cargo, tipo_documento,
+        numero_documento, participacion, fuente, es_principal, activo
     ) VALUES (
         p_empresa_id, p_nombre, p_cargo, p_tipo_documento,
-        p_numero_documento, p_participacion, p_fuente
+        p_numero_documento, p_participacion, p_fuente, p_es_principal, p_activo
     ) RETURNING id INTO v_representante_id;
-    
+
     RETURN v_representante_id;
 END;
 $$ LANGUAGE plpgsql;

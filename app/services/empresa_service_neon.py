@@ -281,19 +281,20 @@ class EmpresaServiceNeon:
             with self._get_connection() as conn:
                 with conn.cursor() as cursor:
                     query = """
-                        SELECT 
+                        SELECT
                             id,
                             nombre,
                             cargo,
                             tipo_documento,
                             numero_documento,
-                            telefono,
-                            email,
+                            participacion,
+                            fuente,
+                            es_principal,
                             activo,
-                            created_at
-                        FROM representantes_legales 
+                            creado_en as created_at
+                        FROM representantes_legales
                         WHERE empresa_id = %s AND activo = true
-                        ORDER BY created_at DESC;
+                        ORDER BY creado_en DESC;
                     """
                     
                     cursor.execute(query, (empresa_id,))
@@ -330,15 +331,15 @@ class EmpresaServiceNeon:
                 with conn.cursor() as cursor:
                     # Generar ID único para el representante
                     representante_id = str(uuid.uuid4())
-                    
+
                     query = """
                         INSERT INTO representantes_legales (
-                            id, empresa_id, nombre, cargo, 
-                            tipo_documento, numero_documento, 
-                            telefono, email, activo, created_at
+                            id, empresa_id, nombre, cargo,
+                            tipo_documento, numero_documento,
+                            participacion, fuente, es_principal, activo, creado_en
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
                     """
-                    
+
                     cursor.execute(query, (
                         representante_id,
                         empresa_id,
@@ -346,16 +347,17 @@ class EmpresaServiceNeon:
                         representante_data.get('cargo', ''),
                         representante_data.get('tipo_documento', 'DNI'),
                         representante_data.get('numero_documento', ''),
-                        representante_data.get('telefono', ''),
-                        representante_data.get('email', ''),
-                        True,
+                        representante_data.get('participacion', None),
+                        representante_data.get('fuente', 'MANUAL'),
+                        representante_data.get('es_principal', False),
+                        representante_data.get('activo', True),
                         datetime.now()
                     ))
-                    
+
                     conn.commit()
                     logger.info(f"✅ Representante guardado para empresa {empresa_id}: {representante_data.get('nombre')}")
                     return representante_id
-                    
+
         except Exception as e:
             logger.error(f"❌ Error guardando representante para empresa {empresa_id}: {e}")
             return None
