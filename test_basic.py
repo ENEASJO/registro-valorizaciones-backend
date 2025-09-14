@@ -18,3 +18,27 @@ def test_health_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
+
+def test_debug_headers_endpoint():
+    """Test that the debug headers endpoint returns 200"""
+    response = client.get("/debug/headers")
+    assert response.status_code == 200
+    data = response.json()
+    assert "url" in data
+    assert "headers" in data
+
+def test_obras_endpoint():
+    """Test that the obras endpoint returns 200"""
+    response = client.get("/obras")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "data" in data
+
+def test_valorizaciones_endpoint():
+    """Test that the valorizaciones endpoint returns 200"""
+    response = client.get("/valorizaciones")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "data" in data
