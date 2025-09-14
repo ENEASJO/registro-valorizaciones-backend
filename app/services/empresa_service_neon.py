@@ -126,6 +126,56 @@ class EmpresaServiceNeon:
                     
                     if empresa_id:
                         logger.info(f"✅ Empresa guardada en Neon - ID: {empresa_id}, RUC: {ruc}")
+
+                        # Guardar representantes legales si existen
+                        representantes = datos_empresa.get('representantes', [])
+                        if representantes:
+                            logger.info(f"📝 Guardando {len(representantes)} representantes legales...")
+
+                            for i, rep in enumerate(representantes):
+                                try:
+                                    # Generar ID único para el representante
+                                    representante_id = str(uuid.uuid4())
+
+                                    # Preparar datos del representante
+                                    rep_data = {
+                                        'id': representante_id,
+                                        'empresa_id': empresa_id,
+                                        'nombre': rep.get('nombre', ''),
+                                        'cargo': rep.get('cargo', 'REPRESENTANTE'),
+                                        'tipo_documento': rep.get('tipo_documento', 'DNI'),
+                                        'numero_documento': rep.get('numero_documento', ''),
+                                        'participacion': rep.get('participacion', None),
+                                        'fuente': rep.get('fuente', 'MANUAL'),
+                                        'es_principal': rep.get('es_principal', False),
+                                        'activo': rep.get('activo', True),
+                                        'creado_en': datetime.now()
+                                    }
+
+                                    # Insertar representante
+                                    insert_rep_query = """
+                                        INSERT INTO representantes_legales (
+                                            id, empresa_id, nombre, cargo,
+                                            tipo_documento, numero_documento,
+                                            participacion, fuente, es_principal, activo, creado_en
+                                        ) VALUES (
+                                            %(id)s, %(empresa_id)s, %(nombre)s, %(cargo)s,
+                                            %(tipo_documento)s, %(numero_documento)s,
+                                            %(participacion)s, %(fuente)s, %(es_principal)s, %(activo)s, %(creado_en)s
+                                        );
+                                    """
+
+                                    cursor.execute(insert_rep_query, rep_data)
+                                    logger.info(f"✅ Representante {i+1} guardado: {rep.get('nombre', 'Sin nombre')}")
+
+                                except Exception as e_rep:
+                                    logger.error(f"❌ Error guardando representante {i+1}: {e_rep}")
+                                    # Continuar con los demás representantes
+
+                            # Commit de todos los representantes
+                            conn.commit()
+                            logger.info(f"✅ Todos los representantes guardados para empresa {ruc}")
+
                         return empresa_id
                     else:
                         logger.warning(f"⚠️ No se obtuvo ID para empresa RUC: {ruc}")
