@@ -133,6 +133,14 @@ class EmpresaServiceNeon:
                         
         except Exception as e:
             logger.error(f"❌ Error guardando empresa en Neon: {e}")
+            import traceback
+            logger.error(f"❌ Traceback completo: {traceback.format_exc()}")
+
+            # Log adicional para depuración
+            logger.error(f"❌ Datos que se intentaron guardar:")
+            for key, value in empresa_data.items():
+                logger.error(f"   - {key}: {value}")
+
             return None
     
     def listar_empresas(self, limit: int = 50) -> List[Dict[str, Any]]:
