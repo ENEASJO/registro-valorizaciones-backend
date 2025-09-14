@@ -1,0 +1,30 @@
+# Ignorar todo excepto archivos esenciales
+*
+!Dockerfile
+!requirements.txt
+!requirements-basic.txt
+!requirements-cloudrun.txt
+!main.py
+!app/
+!*.py
+!static/
+!templates/
+
+# Excluir archivos innecesarios
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.git
+.gitignore
+*.md
+venv/
+.venv/
+*.db
+*.db-journal
+.pytest_cache/
+.coverage
+*.log
+.DS_Store
+Thumbs.db
