@@ -25,7 +25,7 @@ class EmpresaServiceNeon:
             logger.warning("🔄 Usando cadena de conexión por defecto")
             env_connection_string = None
         
-        self.connection_string = env_connection_string or "postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require"
+        self.connection_string = env_connection_string or "postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk.sa-east-1.aws.neon.tech/neondb?sslmode=require"
         
         logger.info(f"🔗 Usando conexión: {self.connection_string[:50]}...")
         self._verificar_conexion()
