@@ -129,8 +129,13 @@ class EmpresaServiceNeon:
 
                         # Guardar representantes legales si existen
                         representantes = datos_empresa.get('representantes', [])
+                        logger.info(f"🔍 [DEBUG] Representantes recibidos: {len(representantes)}")
+                        if not representantes:
+                            logger.warning("⚠️ [DEBUG] No se recibieron representantes en los datos")
                         if representantes:
                             logger.info(f"📝 Guardando {len(representantes)} representantes legales...")
+                            # Mostrar primer representante como debug
+                            logger.info(f"🔍 [DEBUG] Primer representante: {representantes[0]}")
 
                             for i, rep in enumerate(representantes):
                                 try:

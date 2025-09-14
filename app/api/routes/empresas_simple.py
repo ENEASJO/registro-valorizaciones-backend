@@ -162,6 +162,15 @@ async def crear_empresa(empresa_data: Dict[str, Any]):
     try:
         # Validar RUC
         ruc = empresa_data.get('ruc')
+
+        # DEBUG: Log completo de datos recibidos
+        logger.info(f"🔍 [DEBUG] Datos recibidos en crear_empresa:")
+        for key, value in empresa_data.items():
+            if key == 'representantes':
+                logger.info(f"   - {key}: {len(value) if isinstance(value, list) else 'N/A'} items")
+            else:
+                logger.info(f"   - {key}: {value}")
+
         if not validar_ruc(ruc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
