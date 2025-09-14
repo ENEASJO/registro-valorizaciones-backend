@@ -31,9 +31,12 @@ def validar_ruc(ruc: str) -> bool:
 async def listar_empresas():
     """Listar empresas usando Neon PostgreSQL"""
     try:
+        logger.info("🔍 Iniciando listar_empresas desde empresas_simple.py")
         empresa_service = get_empresa_service()
+        logger.info("🔍 Servicio obtenido, llamando a listar_empresas...")
         empresas = empresa_service.listar_empresas(limit=100)
-        
+        logger.info(f"📋 Se obtuvieron {len(empresas)} empresas del servicio")
+
         return {
             "success": True,
             "data": {
@@ -42,9 +45,11 @@ async def listar_empresas():
             },
             "message": f"Se encontraron {len(empresas)} empresa(s)"
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Error listando empresas: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno del servidor: {str(e)}"
