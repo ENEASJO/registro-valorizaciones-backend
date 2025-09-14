@@ -129,7 +129,7 @@ class EmpresaServiceNeon:
                         return empresa_id
                     else:
                         logger.warning(f"⚠️ No se obtuvo ID para empresa RUC: {ruc}")
-                        return "neon-success"
+                        return None
                         
         except Exception as e:
             logger.error(f"❌ Error guardando empresa en Neon: {e}")
