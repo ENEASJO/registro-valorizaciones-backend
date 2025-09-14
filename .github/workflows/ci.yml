@@ -47,11 +47,16 @@ jobs:
       with:
         workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
         service_account: ${{ secrets.SERVICE_ACCOUNT }}
+        audience: ${{ secrets.WIF_PROVIDER }}
 
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
       with:
         project_id: ${{ secrets.PROJECT_ID }}
+
+    - name: Configure Docker
+      run: |
+        gcloud auth configure-docker gcr.io
 
     - name: Build and push Docker image
       run: |
