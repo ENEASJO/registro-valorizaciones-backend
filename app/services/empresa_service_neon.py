@@ -25,7 +25,7 @@ class EmpresaServiceNeon:
             logger.warning("🔄 Usando cadena de conexión por defecto")
             env_connection_string = None
         
-        self.connection_string = env_connection_string or "postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk-pooler.sa-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require"
+        self.connection_string = env_connection_string or "postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require"
         
         logger.info(f"🔗 Usando conexión: {self.connection_string[:50]}...")
         self._verificar_conexion()
@@ -148,20 +148,30 @@ class EmpresaServiceNeon:
         Listar empresas desde Neon con sus representantes
         """
         try:
+            logger.info(f"🔍 Iniciando listar_empresas con limit={limit}")
             with self._get_connection() as conn:
                 with conn.cursor() as cursor:
+                    # Primero contemos cuántas empresas hay
+                    cursor.execute("SELECT COUNT(*) as total FROM empresas;")
+                    count_result = cursor.fetchone()
+                    total_empresas = count_result['total']
+                    logger.info(f"📊 Total de empresas en la base de datos: {total_empresas}")
+
                     query = """
-                        SELECT * FROM empresas 
-                        ORDER BY created_at DESC 
+                        SELECT * FROM empresas
+                        ORDER BY created_at DESC
                         LIMIT %s;
                     """
-                    
+
+                    logger.info(f"🔍 Ejecutando query con limit: {limit}")
                     cursor.execute(query, (limit,))
                     empresas = cursor.fetchall()
-                    
+                    logger.info(f"📋 Empresas obtenidas de la consulta: {len(empresas)}")
+
                     # Convertir RealDictRow a dict y manejar UUIDs
                     result = []
-                    for empresa in empresas:
+                    for i, empresa in enumerate(empresas):
+                        logger.info(f"🔄 Procesando empresa {i+1}: {empresa.get('ruc', 'Sin RUC')}")
                         empresa_dict = dict(empresa)
                         # Convertir UUID a string
                         if 'id' in empresa_dict and empresa_dict['id']:
@@ -177,18 +187,20 @@ class EmpresaServiceNeon:
                                 empresa_dict['datos_osce'] = json.loads(empresa_dict['datos_osce']) if isinstance(empresa_dict['datos_osce'], str) else empresa_dict['datos_osce']
                             except:
                                 pass
-                        
+
                         # Obtener representantes para esta empresa
                         representantes = self._obtener_representantes_por_empresa(empresa_dict['id'])
                         empresa_dict['representantes'] = representantes
-                        
+
                         result.append(empresa_dict)
-                    
-                    logger.info(f"📋 {len(result)} empresas obtenidas desde Neon")
+
+                    logger.info(f"✅ {len(result)} empresas procesadas y retornadas")
                     return result
-                    
+
         except Exception as e:
             logger.error(f"❌ Error listando empresas desde Neon: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return []
     
     def obtener_empresa_por_ruc(self, ruc: str) -> Optional[Dict[str, Any]]:
