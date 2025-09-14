@@ -47,6 +47,7 @@ jobs:
       with:
         workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
         service_account: ${{ secrets.SERVICE_ACCOUNT }}
+        audience: https://github.com/ENEASJO/registro-valorizaciones-backend
 
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
