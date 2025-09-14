@@ -55,6 +55,72 @@ async def listar_empresas():
             detail=f"Error interno del servidor: {str(e)}"
         )
 
+@router.get("/debug/connection")
+async def debug_connection():
+    """Endpoint para depurar la conexión a la base de datos"""
+    try:
+        logger.info("🔍 [DEBUG] Iniciando prueba de conexión...")
+        from app.services.empresa_service_neon import empresa_service_neon
+
+        # Probar conexión básica
+        with empresa_service_neon._get_connection() as conn:
+            with conn.cursor() as cursor:
+                # Probar consulta simple
+                cursor.execute("SELECT 1 as test;")
+                test_result = cursor.fetchone()
+                logger.info(f"🔍 [DEBUG] Conexión básica: {test_result}")
+
+                # Contar empresas
+                cursor.execute("SELECT COUNT(*) as total FROM empresas;")
+                count_result = cursor.fetchone()
+                total = count_result['total']
+                logger.info(f"🔍 [DEBUG] Total de empresas según consulta directa: {total}")
+
+                # Obtener empresas si hay alguna
+                if total > 0:
+                    cursor.execute("SELECT id, ruc, razon_social FROM empresas ORDER BY created_at DESC LIMIT 2;")
+                    empresas = cursor.fetchall()
+                    logger.info(f"🔍 [DEBUG] Primeras empresas: {len(empresas)}")
+
+                    return {
+                        "success": True,
+                        "data": {
+                            "connection_test": "OK",
+                            "total_empresas": total,
+                            "empresas_encontradas": [
+                                {
+                                    "id": str(emp['id']),
+                                    "ruc": emp['ruc'],
+                                    "razon_social": emp['razon_social']
+                                }
+                                for emp in empresas
+                            ],
+                            "connection_string": empresa_service_neon.connection_string[:50] + "..."
+                        },
+                        "message": f"Conexión exitosa. Hay {total} empresas en la base de datos."
+                    }
+                else:
+                    return {
+                        "success": True,
+                        "data": {
+                            "connection_test": "OK",
+                            "total_empresas": 0,
+                            "empresas_encontradas": [],
+                            "connection_string": empresa_service_neon.connection_string[:50] + "..."
+                        },
+                        "message": "Conexión exitosa pero no hay empresas en la base de datos."
+                    }
+
+    except Exception as e:
+        logger.error(f"❌ [DEBUG] Error en prueba de conexión: {e}")
+        import traceback
+        logger.error(f"❌ [DEBUG] Traceback: {traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error en la conexión a la base de datos"
+        }
+
 @router.get("/{empresa_id}")
 async def obtener_empresa(empresa_id: str):
     """Obtener empresa por ID o RUC"""
