@@ -282,12 +282,54 @@ async def listar_empresas(
             "data": resultado,
             "message": f"Se encontraron {total} empresa(s)"
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno del servidor: {str(e)}"
         )
+
+@router.get("/debug/test-connection", response_model=Dict[str, Any])
+async def debug_test_connection():
+    """Endpoint temporal para probar la conexión y consulta directa"""
+    try:
+        from app.services.empresa_service_neon import empresa_service_neon
+
+        # Probar conexión
+        with empresa_service_neon._get_connection() as conn:
+            with conn.cursor() as cursor:
+                # Contar empresas
+                cursor.execute("SELECT COUNT(*) as total FROM empresas;")
+                count_result = cursor.fetchone()
+                total = count_result['total']
+
+                # Obtener empresas
+                cursor.execute("SELECT id, ruc, razon_social FROM empresas ORDER BY created_at DESC LIMIT 5;")
+                empresas = cursor.fetchall()
+
+                return {
+                    "success": True,
+                    "data": {
+                        "total_empresas": total,
+                        "empresas": [
+                            {
+                                "id": str(emp['id']),
+                                "ruc": emp['ruc'],
+                                "razon_social": emp['razon_social']
+                            }
+                            for emp in empresas
+                        ],
+                        "connection_string": empresa_service_neon.connection_string[:50] + "..."
+                    },
+                    "message": f"Conexión exitosa. Encontradas {total} empresas."
+                }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error en la conexión"
+        }
 
 @router.put("/{empresa_id}", response_model=EmpresaResponse)
 async def actualizar_empresa(
