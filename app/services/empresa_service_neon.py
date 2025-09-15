@@ -502,7 +502,7 @@ class EmpresaServiceNeon:
                         INSERT INTO representantes_legales (
                             id, empresa_id, nombre, cargo,
                             tipo_documento, numero_documento,
-                            participacion, fuente, es_principal, activo, created_at
+                            participacion, fuente, es_principal, activo, creado_en
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
                     """
 
