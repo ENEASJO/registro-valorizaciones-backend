@@ -63,15 +63,10 @@ class EmpresaServiceNeon:
                 'ruc': ruc,
                 'razon_social': razon_social,
                 'nombre_comercial': datos_empresa.get('nombre_comercial', ''),
-                'email': datos_empresa.get('email', ''),
-                'telefono': datos_empresa.get('telefono', ''),
-                'celular': datos_empresa.get('celular', ''),
                 'direccion': datos_empresa.get('direccion', ''),
                 'distrito': datos_empresa.get('distrito', ''),
                 'provincia': datos_empresa.get('provincia', ''),
                 'departamento': datos_empresa.get('departamento', ''),
-                'representante_legal': datos_empresa.get('representante_legal', ''),
-                'dni_representante': datos_empresa.get('dni_representante', ''),
                 'estado': datos_empresa.get('estado', 'ACTIVO'),
                 'tipo_empresa': datos_empresa.get('tipo_empresa', 'SAC'),
             'categoria_contratista': datos_empresa.get('categoria_contratista', None),
@@ -85,29 +80,21 @@ class EmpresaServiceNeon:
                     # Insertar o actualizar (ON CONFLICT)
                     insert_query = """
                         INSERT INTO empresas (
-                            codigo, ruc, razon_social, nombre_comercial, email, telefono, celular,
-                            direccion, distrito, provincia, departamento, representante_legal,
-                            dni_representante, estado, tipo_empresa, categoria_contratista, 
-                            datos_sunat, datos_osce, fuentes_consultadas
+                            codigo, ruc, razon_social, nombre_comercial, direccion, distrito, provincia, departamento,
+                            estado, tipo_empresa, categoria_contratista, datos_sunat, datos_osce, fuentes_consultadas
                         ) VALUES (
-                            %(codigo)s, %(ruc)s, %(razon_social)s, %(nombre_comercial)s, %(email)s, 
-                            %(telefono)s, %(celular)s, %(direccion)s, %(distrito)s, %(provincia)s,
-                            %(departamento)s, %(representante_legal)s, %(dni_representante)s,
+                            %(codigo)s, %(ruc)s, %(razon_social)s, %(nombre_comercial)s,
+                            %(direccion)s, %(distrito)s, %(provincia)s, %(departamento)s,
                             %(estado)s, %(tipo_empresa)s, %(categoria_contratista)s,
                             %(datos_sunat)s, %(datos_osce)s, %(fuentes_consultadas)s
                         )
                         ON CONFLICT (ruc) DO UPDATE SET
                             razon_social = EXCLUDED.razon_social,
                             nombre_comercial = EXCLUDED.nombre_comercial,
-                            email = EXCLUDED.email,
-                            telefono = EXCLUDED.telefono,
-                            celular = EXCLUDED.celular,
                             direccion = EXCLUDED.direccion,
                             distrito = EXCLUDED.distrito,
                             provincia = EXCLUDED.provincia,
                             departamento = EXCLUDED.departamento,
-                            representante_legal = EXCLUDED.representante_legal,
-                            dni_representante = EXCLUDED.dni_representante,
                             estado = EXCLUDED.estado,
                             tipo_empresa = EXCLUDED.tipo_empresa,
                             categoria_contratista = EXCLUDED.categoria_contratista,
@@ -181,6 +168,57 @@ class EmpresaServiceNeon:
                             conn.commit()
                             logger.info(f"✅ Todos los representantes guardados para empresa {ruc}")
 
+                        # Guardar contactos de la empresa
+                        contactos = []
+
+                        # Agregar contacto principal si existe email o teléfono
+                        if datos_empresa.get('email') or datos_empresa.get('telefono') or datos_empresa.get('celular'):
+                            contactos.append({
+                                'email': datos_empresa.get('email'),
+                                'telefono': datos_empresa.get('telefono') or datos_empresa.get('celular'),
+                                'tipo_contacto': 'PRINCIPAL',
+                                'fuente': 'MANUAL'
+                            })
+
+                        # Procesar contactos adicionales si existen
+                        if datos_empresa.get('contactos'):
+                            contactos.extend(datos_empresa['contactos'])
+
+                        if contactos:
+                            logger.info(f"🔍 [DEBUG] Procesando {len(contactos)} contactos")
+                            for i, contacto in enumerate(contactos):
+                                try:
+                                    if contacto.get('email') or contacto.get('telefono'):
+                                        contacto_data = {
+                                            'id': str(uuid.uuid4()),
+                                            'empresa_id': empresa_id,
+                                            'email': contacto.get('email'),
+                                            'telefono': contacto.get('telefono'),
+                                            'direccion': contacto.get('direccion'),
+                                            'tipo_contacto': contacto.get('tipo_contacto', 'PRINCIPAL'),
+                                            'fuente': contacto.get('fuente', 'MANUAL'),
+                                            'created_at': datetime.now()
+                                        }
+
+                                        insert_contact_query = """
+                                            INSERT INTO contactos_empresa (
+                                                id, empresa_id, email, telefono, direccion,
+                                                tipo_contacto, fuente, created_at
+                                            ) VALUES (
+                                                %(id)s, %(empresa_id)s, %(email)s, %(telefono)s, %(direccion)s,
+                                                %(tipo_contacto)s, %(fuente)s, %(created_at)s
+                                            );
+                                        """
+
+                                        cursor.execute(insert_contact_query, contacto_data)
+                                        logger.info(f"✅ Contacto {i+1} guardado")
+
+                                except Exception as e_contact:
+                                    logger.error(f"❌ Error guardando contacto {i+1}: {e_contact}")
+
+                            conn.commit()
+                            logger.info(f"✅ Todos los contactos guardados para empresa {ruc}")
+
                         return empresa_id
                     else:
                         logger.warning(f"⚠️ No se obtuvo ID para empresa RUC: {ruc}")
@@ -247,6 +285,10 @@ class EmpresaServiceNeon:
                         representantes = self._obtener_representantes_por_empresa(empresa_dict['id'])
                         empresa_dict['representantes'] = representantes
 
+                        # Obtener contactos para esta empresa
+                        contactos = self._obtener_contactos_por_empresa(empresa_dict['id'])
+                        empresa_dict['contactos'] = contactos
+
                         result.append(empresa_dict)
 
                     logger.info(f"✅ {len(result)} empresas procesadas y retornadas")
@@ -278,7 +320,11 @@ class EmpresaServiceNeon:
                         # Obtener representantes para esta empresa
                         representantes = self._obtener_representantes_por_empresa(empresa_dict['id'])
                         empresa_dict['representantes'] = representantes
-                        
+
+                        # Obtener contactos para esta empresa
+                        contactos = self._obtener_contactos_por_empresa(empresa_dict['id'])
+                        empresa_dict['contactos'] = contactos
+
                         return empresa_dict
                     return None
                     
@@ -366,10 +412,10 @@ class EmpresaServiceNeon:
                             fuente,
                             es_principal,
                             activo,
-                            creado_en as created_at
+                            created_at
                         FROM representantes_legales
                         WHERE empresa_id = %s AND activo = true
-                        ORDER BY creado_en DESC;
+                        ORDER BY created_at DESC;
                     """
                     
                     cursor.execute(query, (empresa_id,))
@@ -390,7 +436,47 @@ class EmpresaServiceNeon:
         except Exception as e:
             logger.error(f"❌ Error obteniendo representantes para empresa {empresa_id}: {e}")
             return []
-    
+
+    def _obtener_contactos_por_empresa(self, empresa_id: str) -> List[Dict[str, Any]]:
+        """
+        Obtener contactos de una empresa específica
+        """
+        try:
+            with self._get_connection() as conn:
+                with conn.cursor() as cursor:
+                    query = """
+                        SELECT
+                            id,
+                            email,
+                            telefono,
+                            direccion,
+                            tipo_contacto,
+                            fuente,
+                            created_at
+                        FROM contactos_empresa
+                        WHERE empresa_id = %s
+                        ORDER BY created_at DESC;
+                    """
+
+                    cursor.execute(query, (empresa_id,))
+                    contactos = cursor.fetchall()
+
+                    # Convertir a lista de diccionarios
+                    result = []
+                    for contacto in contactos:
+                        contacto_dict = dict(contacto)
+                        # Convertir UUID a string si es necesario
+                        if 'id' in contacto_dict and contacto_dict['id']:
+                            contacto_dict['id'] = str(contacto_dict['id'])
+                        result.append(contacto_dict)
+
+                    logger.info(f"📋 {len(result)} contactos obtenidos para empresa {empresa_id}")
+                    return result
+
+        except Exception as e:
+            logger.error(f"❌ Error obteniendo contactos para empresa {empresa_id}: {e}")
+            return []
+
     def obtener_representantes_por_empresa(self, empresa_id: str) -> List[Dict[str, Any]]:
         """
         Método público para obtener representantes legales de una empresa
