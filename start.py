@@ -37,9 +37,9 @@ if __name__ == "__main__":
     try:
         print(f"▶️ Iniciando uvicorn...")
         uvicorn.run(
-            "main_simple:app", 
-            host=host, 
-            port=port, 
+            "main:app",
+            host=host,
+            port=port,
             workers=1,
             log_level="debug",
             access_log=True,

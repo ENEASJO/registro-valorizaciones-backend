@@ -65,7 +65,7 @@ def convertir_empresa_dict_a_response(empresa_dict: Dict[str, Any]) -> EmpresaRe
         nombre_comercial=empresa_dict.get('nombre_comercial'),
         email=empresa_dict.get('email'),
         telefono=empresa_dict.get('telefono'),
-        celular=empresa_dict.get('celular'),
+        celular=empresa_dict.get('telefono'),  # Map telefono to celular for frontend compatibility
         direccion=empresa_dict.get('direccion'),
         representante_legal=empresa_dict.get('representante_legal'),
         dni_representante=empresa_dict.get('dni_representante'),

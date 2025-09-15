@@ -202,16 +202,16 @@ class EmpresaServiceNeon:
                                             'direccion': contacto.get('direccion'),
                                             'tipo_contacto': contacto.get('tipo_contacto', 'PRINCIPAL'),
                                             'fuente': contacto.get('fuente', 'MANUAL'),
-                                            'created_at': datetime.now()
+                                            'creado_en': datetime.now()
                                         }
 
                                         insert_contact_query = """
                                             INSERT INTO contactos_empresa (
                                                 id, empresa_id, email, telefono, direccion,
-                                                tipo_contacto, fuente, created_at
+                                                tipo_contacto, fuente, creado_en
                                             ) VALUES (
                                                 %(id)s, %(empresa_id)s, %(email)s, %(telefono)s, %(direccion)s,
-                                                %(tipo_contacto)s, %(fuente)s, %(created_at)s
+                                                %(tipo_contacto)s, %(fuente)s, %(creado_en)s
                                             );
                                         """
 
@@ -457,10 +457,10 @@ class EmpresaServiceNeon:
                             direccion,
                             tipo_contacto,
                             fuente,
-                            created_at
+                            creado_en
                         FROM contactos_empresa
                         WHERE empresa_id = %s
-                        ORDER BY created_at DESC;
+                        ORDER BY creado_en DESC;
                     """
 
                     cursor.execute(query, (empresa_id,))
@@ -502,7 +502,7 @@ class EmpresaServiceNeon:
                         INSERT INTO representantes_legales (
                             id, empresa_id, nombre, cargo,
                             tipo_documento, numero_documento,
-                            participacion, fuente, es_principal, activo, creado_en
+                            participacion, fuente, es_principal, activo, created_at
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
                     """
 

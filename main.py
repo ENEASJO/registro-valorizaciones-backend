@@ -15,14 +15,14 @@ app = FastAPI(
     version="4.2.1"
 )
 
-# Cargar router de empresas simplificado
+# Cargar router de empresas completo
 try:
-    print("📦 Cargando router de empresas simplificado...")
-    from app.api.routes.empresas_simple import router as empresas_router
+    print("📦 Cargando router de empresas completo...")
+    from app.api.routes.empresas import router as empresas_router
     app.include_router(empresas_router)
-    print("✅ Router de empresas simplificado cargado exitosamente")
+    print("✅ Router de empresas completo cargado exitosamente")
 except Exception as e:
-    print(f"❌ Error cargando router de empresas simplificado: {e}")
+    print(f"❌ Error cargando router de empresas completo: {e}")
     import traceback
     traceback.print_exc()
 
