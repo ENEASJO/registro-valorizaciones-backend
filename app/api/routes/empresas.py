@@ -58,7 +58,7 @@ def convertir_empresa_dict_a_response(empresa_dict: Dict[str, Any]) -> EmpresaRe
         ))
 
     return EmpresaResponse(
-        id=empresa_dict.get('id', 0),
+        id=int(empresa_dict.get('id', 0)),
         codigo=empresa_dict.get('codigo', ''),
         ruc=empresa_dict.get('ruc', ''),
         razon_social=empresa_dict.get('razon_social', ''),
