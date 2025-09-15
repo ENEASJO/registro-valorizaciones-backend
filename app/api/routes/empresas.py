@@ -355,13 +355,28 @@ async def debug_detailed_error():
         from app.services.empresa_service_neon import empresa_service_neon
         import traceback
 
-        # Probar obtener una empresa específica para ver el error
-        empresas = empresa_service_neon.listar_empresas(limit=1)
+        # Probar obtener empresas y convertirlas igual que el endpoint principal
+        empresas_raw = empresa_service_neon.listar_empresas(limit=1)
+
+        # Probar la conversión que causa el error
+        empresas_response = []
+        for empresa in empresas_raw:
+            try:
+                empresa_response = convertir_empresa_dict_a_response(empresa)
+                empresas_response.append(empresa_response)
+            except Exception as conv_error:
+                return {
+                    "success": False,
+                    "error": f"Error en conversión: {str(conv_error)}",
+                    "error_type": type(conv_error).__name__,
+                    "empresa_data": empresa,
+                    "traceback": traceback.format_exc()
+                }
 
         return {
             "success": True,
             "message": "No error occurred",
-            "empresas_count": len(empresas),
+            "empresas_count": len(empresas_response),
             "traceback": None
         }
 
