@@ -63,6 +63,8 @@ class EmpresaServiceNeon:
                 'ruc': ruc,
                 'razon_social': razon_social,
                 'nombre_comercial': datos_empresa.get('nombre_comercial', ''),
+                'email': datos_empresa.get('email'),
+                'telefono': datos_empresa.get('telefono'),
                 'direccion': datos_empresa.get('direccion', ''),
                 'distrito': datos_empresa.get('distrito', ''),
                 'provincia': datos_empresa.get('provincia', ''),
@@ -80,17 +82,20 @@ class EmpresaServiceNeon:
                     # Insertar o actualizar (ON CONFLICT)
                     insert_query = """
                         INSERT INTO empresas (
-                            codigo, ruc, razon_social, nombre_comercial, direccion, distrito, provincia, departamento,
+                            codigo, ruc, razon_social, nombre_comercial, email, telefono,
+                            direccion, distrito, provincia, departamento,
                             estado, tipo_empresa, categoria_contratista, datos_sunat, datos_osce, fuentes_consultadas
                         ) VALUES (
                             %(codigo)s, %(ruc)s, %(razon_social)s, %(nombre_comercial)s,
-                            %(direccion)s, %(distrito)s, %(provincia)s, %(departamento)s,
+                            %(email)s, %(telefono)s, %(direccion)s, %(distrito)s, %(provincia)s, %(departamento)s,
                             %(estado)s, %(tipo_empresa)s, %(categoria_contratista)s,
                             %(datos_sunat)s, %(datos_osce)s, %(fuentes_consultadas)s
                         )
                         ON CONFLICT (ruc) DO UPDATE SET
                             razon_social = EXCLUDED.razon_social,
                             nombre_comercial = EXCLUDED.nombre_comercial,
+                            email = EXCLUDED.email,
+                            telefono = EXCLUDED.telefono,
                             direccion = EXCLUDED.direccion,
                             distrito = EXCLUDED.distrito,
                             provincia = EXCLUDED.provincia,
