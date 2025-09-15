@@ -154,7 +154,7 @@ class EmpresaServiceNeon:
                                         'fuente': rep.get('fuente', 'MANUAL'),
                                         'es_principal': rep.get('es_principal', False),
                                         'activo': rep.get('activo', True),
-                                        'creado_en': datetime.now()
+                                        'created_at': datetime.now()
                                     }
 
                                     # Insertar representante
@@ -162,11 +162,11 @@ class EmpresaServiceNeon:
                                         INSERT INTO representantes_legales (
                                             id, empresa_id, nombre, cargo,
                                             tipo_documento, numero_documento,
-                                            participacion, fuente, es_principal, activo, creado_en
+                                            participacion, fuente, es_principal, activo, created_at
                                         ) VALUES (
                                             %(id)s, %(empresa_id)s, %(nombre)s, %(cargo)s,
                                             %(tipo_documento)s, %(numero_documento)s,
-                                            %(participacion)s, %(fuente)s, %(es_principal)s, %(activo)s, %(creado_en)s
+                                            %(participacion)s, %(fuente)s, %(es_principal)s, %(activo)s, %(created_at)s
                                         );
                                     """
 
