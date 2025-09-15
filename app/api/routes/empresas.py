@@ -51,10 +51,10 @@ def convertir_empresa_dict_a_response(empresa_dict: Dict[str, Any]) -> EmpresaRe
             tipo_documento=rep.get('tipo_documento', 'DNI'),
             fuente=rep.get('fuente'),
             participacion=rep.get('participacion'),
-            fecha_desde=datetime.fromisoformat(rep.get('fecha_desde', datetime.now().isoformat())) if rep.get('fecha_desde') else None,
+            fecha_desde=rep.get('fecha_desde') if isinstance(rep.get('fecha_desde'), datetime) else (datetime.fromisoformat(rep.get('fecha_desde')) if rep.get('fecha_desde') else None),
             es_principal=rep.get('es_principal', False),
             estado=rep.get('estado', 'ACTIVO'),
-            created_at=datetime.fromisoformat(rep.get('created_at', datetime.now().isoformat()))
+            created_at=rep.get('created_at') if isinstance(rep.get('created_at'), datetime) else (datetime.fromisoformat(rep.get('created_at')) if rep.get('created_at') else datetime.now())
         ))
 
     return EmpresaResponse(
@@ -76,8 +76,8 @@ def convertir_empresa_dict_a_response(empresa_dict: Dict[str, Any]) -> EmpresaRe
         representantes=representantes_response,
         total_representantes=len(representantes_response),
         activo=bool(empresa_dict.get('activo', True)),
-        created_at=datetime.fromisoformat(empresa_dict.get('created_at', datetime.now().isoformat())),
-        updated_at=datetime.fromisoformat(empresa_dict.get('updated_at', datetime.now().isoformat()))
+        created_at=empresa_dict.get('created_at') if isinstance(empresa_dict.get('created_at'), datetime) else (datetime.fromisoformat(empresa_dict.get('created_at')) if empresa_dict.get('created_at') else datetime.now()),
+        updated_at=empresa_dict.get('updated_at') if isinstance(empresa_dict.get('updated_at'), datetime) else (datetime.fromisoformat(empresa_dict.get('updated_at')) if empresa_dict.get('updated_at') else datetime.now())
     )
 
 @router.post("/", response_model=EmpresaResponse, status_code=status.HTTP_201_CREATED)
