@@ -157,7 +157,7 @@ class RepresentanteResponse(BaseModel):
 
 class EmpresaResponse(BaseModel):
     """Schema de respuesta para empresa"""
-    id: int
+    id: str
     codigo: str
     ruc: str
     razon_social: str
