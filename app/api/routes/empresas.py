@@ -348,6 +348,32 @@ async def listar_empresas(
             detail=f"Error interno del servidor: {str(e)}"
         )
 
+@router.get("/debug/detailed-error", response_model=Dict[str, Any])
+async def debug_detailed_error():
+    """Endpoint para depurar error detallado"""
+    try:
+        from app.services.empresa_service_neon import empresa_service_neon
+        import traceback
+
+        # Probar obtener una empresa específica para ver el error
+        empresas = empresa_service_neon.listar_empresas(limit=1)
+
+        return {
+            "success": True,
+            "message": "No error occurred",
+            "empresas_count": len(empresas),
+            "traceback": None
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "traceback": traceback.format_exc(),
+            "full_error": f"Error interno del servidor: {str(e)}"
+        }
+
 @router.get("/debug/test-connection", response_model=Dict[str, Any])
 async def debug_test_connection():
     """Endpoint temporal para probar la conexión y consulta directa"""
