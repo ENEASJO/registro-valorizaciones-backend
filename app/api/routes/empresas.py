@@ -44,7 +44,7 @@ def convertir_empresa_dict_a_response(empresa_dict: Dict[str, Any]) -> EmpresaRe
 
     for rep in representantes:
         representantes_response.append(RepresentanteResponse(
-            id=rep.get('id', 0),
+            id=rep.get('id', '0'),
             nombre=rep.get('nombre', ''),
             cargo=rep.get('cargo', ''),
             numero_documento=rep.get('numero_documento', ''),

@@ -140,7 +140,7 @@ class EmpresaCreateSchema(BaseModel):
 
 class RepresentanteResponse(BaseModel):
     """Schema de respuesta para representante"""
-    id: int
+    id: str
     nombre: str
     cargo: str
     numero_documento: str
