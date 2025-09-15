@@ -58,6 +58,7 @@ def test_representante_response_uuid():
         'tipo_documento': 'DNI',
         'es_principal': True,
         'activo': True,
+        'estado': 'ACTIVO',  # Campo requerido
         'created_at': datetime.now()
     }
 
