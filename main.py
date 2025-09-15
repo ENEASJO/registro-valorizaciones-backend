@@ -26,6 +26,17 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Cargar router de debug
+try:
+    print("📦 Cargando router de debug...")
+    from app.api.routes.debug_logs import router as debug_router
+    app.include_router(debug_router, prefix="/api")
+    print("✅ Router de debug cargado exitosamente")
+except Exception as e:
+    print(f"❌ Error cargando router de debug: {e}")
+    import traceback
+    traceback.print_exc()
+
 # Middleware para manejar headers de proxy (Cloud Run) - DEBE ESTAR ANTES DE CORS
 # Temporalmente desactivado para solucionar error 500
 enable_proxy_middleware = os.environ.get('ENABLE_PROXY_MIDDLEWARE', 'true').lower() == 'true'
