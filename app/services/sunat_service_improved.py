@@ -225,7 +225,7 @@ class SUNATServiceImproved:
 
     def _procesar_fila_representante(self, row_data: List[str]) -> Optional[RepresentanteLegal]:
         """Procesar una fila de tabla de representantes"""
-        if not row_data or len(row_data) < 3:
+        if not row_data or len(row_data) < 4:
             return None
 
         nombre = ""
@@ -236,32 +236,30 @@ class SUNATServiceImproved:
 
         # Procesar según el número de columnas
         if len(row_data) >= 5:
-            # Formato completo: Nombre, Cargo, Tipo Doc, Número Doc, Fecha
-            nombre = row_data[0]
-            cargo = row_data[1]
-            tipo_doc = row_data[2]
-            numero_doc = row_data[3]
+            # Formato SUNAT: Tipo Doc, Número Doc, Nombre, Cargo, Fecha
+            tipo_doc = row_data[0]
+            numero_doc = row_data[1]
+            nombre = row_data[2]
+            cargo = row_data[3]
             fecha_desde = row_data[4]
         elif len(row_data) >= 4:
-            # Formato sin fecha: Nombre, Cargo, Tipo Doc, Número Doc
-            nombre = row_data[0]
-            cargo = row_data[1]
-            tipo_doc = row_data[2]
-            numero_doc = row_data[3]
-        elif len(row_data) >= 3:
-            # Formato mínimo: Nombre, Cargo, Documento
-            nombre = row_data[0]
-            cargo = row_data[1]
-            # El tercer campo podría ser DNI o número completo
-            if row_data[2].isdigit():
-                numero_doc = row_data[2]
-                tipo_doc = "DNI"
-            else:
-                # Buscar DNI en el texto
-                dni_match = re.search(r'\b\d{8}\b', row_data[2])
-                if dni_match:
-                    numero_doc = dni_match.group()
+            # Formato sin fecha: Tipo Doc, Número Doc, Nombre, Cargo
+            tipo_doc = row_data[0]
+            numero_doc = row_data[1]
+            nombre = row_data[2]
+            cargo = row_data[3]
+        else:
+            # Formato alternativo - intentar detectar patrones
+            for i, campo in enumerate(row_data):
+                if campo.isdigit() and len(campo) == 8:
+                    numero_doc = campo
                     tipo_doc = "DNI"
+                elif campo.upper() in ["DNI", "CE", "PASAPORTE"]:
+                    tipo_doc = campo
+                elif any(cargo_kw in campo.upper() for cargo_kw in ["GERENTE", "DIRECTOR", "ADMINISTRADOR", "REPRESENTANTE", "PRESIDENTE"]):
+                    cargo = campo
+                elif len(campo) > 10 and campo.isupper():
+                    nombre = campo
 
         # Validar datos mínimos
         if not nombre or len(nombre) < 5:
@@ -615,6 +613,8 @@ class SUNATServiceImproved:
 
     async def _extraer_datos_basicos_mejorado(self, page, ruc: str) -> Dict[str, str]:
         """Extraer datos básicos mejorado"""
+        logger.info("📋 Extrayendo datos básicos...")
+
         datos = {
             "razon_social": "No disponible",
             "estado": "ACTIVO",
@@ -628,19 +628,21 @@ class SUNATServiceImproved:
             # Buscar razón social en h4
             h4_elements = await page.query_selector_all('h4')
             for h4 in h4_elements:
-                text = await h4.inner_text()
-                text = text.strip()
+                try:
+                    text = await h4.inner_text()
+                    text = text.strip()
 
-                if " - " in text and text.startswith(ruc):
-                    parts = text.split(" - ", 1)
-                    if len(parts) >= 2:
-                        datos["razon_social"] = parts[1].strip()
-                        break
-
-            # Buscar dirección y estado
-            texto_completo = await page.inner_text('body')
+                    if " - " in text and text.startswith(ruc):
+                        parts = text.split(" - ", 1)
+                        if len(parts) >= 2 and len(parts[1].strip()) > 5:
+                            datos["razon_social"] = parts[1].strip()
+                            logger.info(f"✅ Razón social encontrada: {datos['razon_social']}")
+                            break
+                except:
+                    continue
 
             # Buscar estado
+            texto_completo = await page.inner_text('body')
             if "ACTIVO" in texto_completo.upper():
                 datos["estado"] = "ACTIVO"
             elif "INACTIVO" in texto_completo.upper():
@@ -648,17 +650,20 @@ class SUNATServiceImproved:
 
             # Buscar dirección (patrones mejorados)
             direccion_patterns = [
+                r'Domicilio Fiscal:\s*(.+)',
                 r'Dirección:\s*(.+)',
-                r'Domicilio:\s*(.+)',
                 r'AV\.\s*[A-ZÁÉÍÓÚÑ\s]+',
                 r'JR\.\s*[A-ZÁÉÍÓÚÑ\s]+',
-                r'CALLE\s*[A-ZÁÉÍÓÚÑ\s]+\s*'
+                r'CALLE\s*[A-ZÁÉÍÓÚÑ\s]+',
+                r'CAL\.\s*[A-ZÁÉÍÓÚÑ\s]+',
+                r'PSJE\.\s*[A-ZÁÉÍÓÚÑ\s]+'
             ]
 
             for pattern in direccion_patterns:
                 match = re.search(pattern, texto_completo, re.IGNORECASE)
                 if match:
                     datos["direccion"] = match.group(1).strip() if match.group(1) else match.group(0).strip()
+                    logger.info(f"✅ Dirección encontrada: {datos['direccion']}")
                     break
 
         except Exception as e:
