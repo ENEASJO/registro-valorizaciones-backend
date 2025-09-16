@@ -116,20 +116,25 @@ async def crear_empresa(
         #         detail="Debe proporcionar al menos un representante"
         #     )
         
-        # Validar índice de representante principal solo si hay representantes
-        if empresa_data.representantes:
-            if (empresa_data.representante_principal_id < 0 or
-                empresa_data.representante_principal_id >= len(empresa_data.representantes)):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Índice de representante principal inválido"
-                )
+        # Identificar representante principal por cargo (GERENTE, GERENTE GENERAL, etc.)
+        representante_principal = None
+        representante_principal_index = 0
 
-            # Preparar datos para crear empresa
-            representante_principal = empresa_data.representantes[empresa_data.representante_principal_id]
-        else:
-            # No hay representantes, usar datos vacíos
-            representante_principal = None
+        if empresa_data.representantes:
+            # Buscar representante con cargo de gerente
+            cargos_principales = ['GERENTE GENERAL', 'GERENTE', 'ADMINISTRADOR', 'PRESIDENTE', 'DIRECTOR GENERAL']
+
+            for i, representante in enumerate(empresa_data.representantes):
+                cargo_upper = representante.cargo.upper() if representante.cargo else ''
+                if any(cargo_principal in cargo_upper for cargo_principal in cargos_principales):
+                    representante_principal = representante
+                    representante_principal_index = i
+                    break
+
+            # Si no se encuentra gerente, usar el primer representante
+            if representante_principal is None:
+                representante_principal = empresa_data.representantes[0]
+                representante_principal_index = 0
         
         # Preparar datos para enviar (estructura para la API externa)
         if representante_principal:
@@ -179,18 +184,20 @@ async def crear_empresa(
         }
         
         empresa_service = get_empresa_service()
-        empresa_id = empresa_service.guardar_empresa(empresa_data_neon)
 
-        if not empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error creando empresa en la base de datos"
-            )
+        # Preparar datos completos para guardar_empresa incluyendo TODOS los representantes
+        empresa_data_completa = {
+            'ruc': empresa_data.ruc,
+            'razon_social': empresa_data.razon_social,
+            'nombre_comercial': empresa_data.nombre_comercial,
+            'email': empresa_data.email or '',
+            'telefono': empresa_data.celular or '',
+            'direccion': empresa_data.direccion or '',
+            'representantes': []
+        }
 
-        # Guardar TODOS los representantes en la tabla representantes_legales
-        representantes_guardados = []
+        # Preparar todos los representantes con la información correcta de quién es principal
         for i, representante in enumerate(empresa_data.representantes):
-            # Preparar datos del representante para guardar_representante
             representante_data = {
                 'nombre': representante.nombre,
                 'cargo': representante.cargo,
@@ -198,28 +205,21 @@ async def crear_empresa(
                 'numero_documento': representante.numero_documento,
                 'participacion': representante.participacion if hasattr(representante, 'participacion') else None,
                 'fuente': representante.fuente or 'MANUAL',
-                'es_principal': i == empresa_data.representante_principal_id,
+                'es_principal': i == representante_principal_index,  # Usar el índice identificado automáticamente
                 'activo': representante.activo if hasattr(representante, 'activo') else True
             }
+            empresa_data_completa['representantes'].append(representante_data)
 
-            # Guardar el representante
-            representante_id = empresa_service.guardar_representante(empresa_id, representante_data)
+        # Guardar empresa y todos sus representantes de una sola vez
+        empresa_id = empresa_service.guardar_empresa(empresa_data_completa)
 
-            if representante_id:
-                representantes_guardados.append({
-                    'id': representante_id,
-                    'nombre': representante.nombre,
-                    'cargo': representante.cargo,
-                    'numero_documento': representante.numero_documento,
-                    'tipo_documento': representante.tipo_documento,
-                    'fuente': representante.fuente,
-                    'es_principal': i == empresa_data.representante_principal_id,
-                    'activo': representante.activo if hasattr(representante, 'activo') else True,
-                    'created_at': datetime.now()
-                })
-                logger.info(f"✅ Representante guardado: {representante.nombre} para empresa {empresa_id}")
-            else:
-                logger.error(f"❌ Error guardando representante: {representante.nombre}")
+        if not empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error creando empresa en la base de datos"
+            )
+
+        logger.info(f"✅ Empresa y {len(empresa_data.representantes)} representantes guardados correctamente")
 
         # Obtener empresa creada con todos sus representantes para retornar
         empresa_creada = empresa_service.obtener_empresa_por_ruc(empresa_data.ruc)
@@ -228,11 +228,6 @@ async def crear_empresa(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error obteniendo empresa creada"
             )
-
-        # Asegurar que la respuesta incluya todos los representantes guardados
-        if representantes_guardados:
-            empresa_creada['representantes'] = representantes_guardados
-            empresa_creada['total_representantes'] = len(representantes_guardados)
 
         return convertir_empresa_dict_a_response(empresa_creada)
         
