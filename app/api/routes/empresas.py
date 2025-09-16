@@ -109,39 +109,58 @@ async def crear_empresa(
                 detail=f"Ya existe una empresa con RUC {empresa_data.ruc}. Por favor, busque la empresa existente o actualícela si es necesario."
             )
         
-        # Validar que tenga al menos un representante
-        if not empresa_data.representantes:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Debe proporcionar al menos un representante"
-            )
+        # Validar que tenga al menos un representante (removido para permitir creación sin representantes)
+        # if not empresa_data.representantes:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="Debe proporcionar al menos un representante"
+        #     )
         
-        # Validar índice de representante principal
-        if (empresa_data.representante_principal_id < 0 or 
-            empresa_data.representante_principal_id >= len(empresa_data.representantes)):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Índice de representante principal inválido"
-            )
+        # Validar índice de representante principal solo si hay representantes
+        if empresa_data.representantes:
+            if (empresa_data.representante_principal_id < 0 or
+                empresa_data.representante_principal_id >= len(empresa_data.representantes)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Índice de representante principal inválido"
+                )
+
+            # Preparar datos para crear empresa
+            representante_principal = empresa_data.representantes[empresa_data.representante_principal_id]
+        else:
+            # No hay representantes, usar datos vacíos
+            representante_principal = None
         
-        # Preparar datos para crear empresa
-        representante_principal = empresa_data.representantes[empresa_data.representante_principal_id]
-        
-        datos_empresa = {
-            'data': {
-                'razon_social': empresa_data.razon_social,
-                'contacto': {
-                    'email': empresa_data.email or '',
-                    'telefono': empresa_data.celular or '',
-                    'direccion': empresa_data.direccion or ''
-                },
-                'miembros': [{
-                    'nombre': representante_principal.nombre,
-                    'numero_documento': representante_principal.numero_documento,
-                    'cargo': representante_principal.cargo
-                }]
+        # Preparar datos para enviar (estructura para la API externa)
+        if representante_principal:
+            datos_empresa = {
+                'data': {
+                    'razon_social': empresa_data.razon_social,
+                    'contacto': {
+                        'email': empresa_data.email or '',
+                        'telefono': empresa_data.celular or '',
+                        'direccion': empresa_data.direccion or ''
+                    },
+                    'miembros': [{
+                        'nombre': representante_principal.nombre,
+                        'numero_documento': representante_principal.numero_documento,
+                        'cargo': representante_principal.cargo
+                    }]
+                }
             }
-        }
+        else:
+            # Sin representantes
+            datos_empresa = {
+                'data': {
+                    'razon_social': empresa_data.razon_social,
+                    'contacto': {
+                        'email': empresa_data.email or '',
+                        'telefono': empresa_data.celular or '',
+                        'direccion': empresa_data.direccion or ''
+                    },
+                    'miembros': []
+                }
+            }
         
         # CAMBIO: Crear empresa en Neon PostgreSQL
         
