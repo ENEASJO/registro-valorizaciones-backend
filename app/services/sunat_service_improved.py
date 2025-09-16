@@ -29,14 +29,20 @@ class SUNATServiceImproved:
             raise ValidationException(f"RUC inválido: {ruc}")
 
         async with async_playwright() as p:
+            browser = None
             try:
                 launch_options = get_browser_launch_options(headless=True)
+                logger.info(f"Opciones de lanzamiento: {launch_options}")
+
                 browser = await p.chromium.launch(**launch_options)
 
-                page = await browser.new_page(
+                context = await browser.new_context(
                     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    viewport={'width': 1280, 'height': 720}
+                    viewport={'width': 1280, 'height': 720},
+                    ignore_https_errors=True
                 )
+
+                page = await context.new_page()
 
                 logger.info("Navegando a SUNAT...")
                 await page.goto(self.base_url, timeout=self.timeout)
@@ -78,14 +84,16 @@ class SUNATServiceImproved:
                 )
 
                 logger.info(f"✅ Consulta SUNAT mejorada completada: {len(representantes)} representantes")
-                await browser.close()
                 return empresa_info
 
             except Exception as e:
                 logger.error(f"Error en consulta SUNAT mejorada: {str(e)}")
-                if 'browser' in locals():
+                if browser:
                     await browser.close()
                 raise ExtractionException(f"Error consultando SUNAT: {str(e)}")
+            finally:
+                if browser:
+                    await browser.close()
 
     async def _extraer_representantes_mejorado(self, page, ruc: str) -> List[RepresentanteLegal]:
         """Método mejorado para extraer representantes"""
@@ -269,54 +277,124 @@ class SUNATServiceImproved:
         representantes = []
         lineas = texto.split('\n')
 
-        # Buscar patrones específicos de SUNAT
+        # Patrones mejorados para nombres completos
+        patrones_nombre = [
+            r'([A-ZÁÉÍÓÚÑ\s]+,?\s+[A-ZÁÉÍÓÚÑ\s]+)',  # Apellido, Nombre
+            r'([A-ZÁÉÍÓÚÑ]+\s+[A-ZÁÉÍÓÚÑ]+\s+[A-ZÁÉÍÓÚÑ\s]+)'  # Nombre completo
+        ]
+
+        # Buscar bloques de información
         i = 0
         while i < len(lineas):
             linea = lineas[i].strip()
 
-            # Patrón: Nombre completo en mayúsculas
-            if (len(linea) > 20 and
+            # Buscar nombres que parezcan personas (no empresas)
+            if (len(linea) > 15 and
                 linea.isupper() and
                 any(char.isalpha() for char in linea) and
-                not any(kw in linea for kw in ['RUC:', 'FECHA:', 'ESTADO:', 'DIRECCIÓN:'])):
+                not any(kw in linea for kw in ['S.A.C', 'S.A.', 'S.R.L', 'SOCIEDAD ANONIMA', 'RUC:', 'AV.', 'JR.', 'CALLE'])):
 
-                # Buscar DNI en líneas cercanas
-                dni = ""
-                cargo = ""
+                # Verificar si es un nombre de persona (no empresa)
+                palabras = linea.split()
+                if len(palabras) >= 2 and all(len(p) > 1 for p in palabras[:2]):
+                    # Buscar información relacionada en líneas cercanas
+                    nombre_candidato = linea
+                    dni = ""
+                    cargo = ""
+                    fecha_desde = ""
 
-                # Buscar en 3 líneas antes y después
-                for j in range(max(0, i-3), min(len(lineas), i+4)):
-                    if j == i:
-                        continue
+                    # Buscar en contexto cercano (3 líneas antes y 5 después)
+                    for j in range(max(0, i-3), min(len(lineas), i+6)):
+                        if j == i:
+                            continue
 
-                    linea_busqueda = lineas[j].strip()
+                        linea_busqueda = lineas[j].strip()
 
-                    # Buscar DNI
-                    dni_match = re.search(r'\b\d{8}\b', linea_busqueda)
-                    if dni_match:
-                        dni = dni_match.group()
+                        # Buscar DNI (8 dígitos)
+                        dni_match = re.search(r'\b(\d{8})\b', linea_busqueda)
+                        if dni_match:
+                            dni = dni_match.group(1)
 
-                    # Buscar cargo
-                    if any(cargo_kw in linea_busqueda.upper() for cargo_kw in [
-                        'GERENTE GENERAL', 'GERENTE', 'DIRECTOR', 'ADMINISTRADOR',
-                        'REPRESENTANTE LEGAL', 'PRESIDENTE', 'APODERADO'
-                    ]):
-                        cargo = linea_busqueda.strip()
+                        # Buscar cargo específico
+                        if any(cargo_kw in linea_busqueda.upper() for cargo_kw in [
+                            'GERENTE GENERAL', 'GERENTE', 'DIRECTOR', 'ADMINISTRADOR',
+                            'REPRESENTANTE LEGAL', 'PRESIDENTE', 'APODERADO'
+                        ]):
+                            # Limpiar el cargo
+                            if ':' in linea_busqueda:
+                                cargo = linea_busqueda.split(':')[1].strip().upper()
+                            else:
+                                cargo = linea_busqueda.upper()
 
-                # Si encontramos al menos nombre y DNI o cargo
-                if dni or cargo:
-                    representante = RepresentanteLegal(
-                        nombre=linea,
-                        cargo=cargo or "REPRESENTANTE LEGAL",
-                        tipo_doc="DNI",
-                        numero_doc=dni,
-                        fecha_desde=""
-                    )
-                    representantes.append(representante)
+                        # Buscar fecha
+                        fecha_match = re.search(r'\b\d{2}/\d{2}/\d{4}\b', linea_busqueda)
+                        if fecha_match:
+                            fecha_desde = fecha_match.group()
+
+                        # Buscar "REPRESENTANTE:" seguido de nombre
+                        if 'REPRESENTANTE:' in linea_busqueda.upper() and ':' in linea_busqueda:
+                            nombre_pos = linea_busqueda.find(':')
+                            posible_nombre = linea_busqueda[nombre_pos+1:].strip()
+                            if len(posible_nombre) > 5:
+                                nombre_candidato = posible_nombre
+
+                    # Solo agregar si tenemos nombre y DNI (más confiable)
+                    if nombre_candidato and dni:
+                        representante = RepresentanteLegal(
+                            nombre=nombre_candidato,
+                            cargo=cargo or "REPRESENTANTE LEGAL",
+                            tipo_doc="DNI",
+                            numero_doc=dni,
+                            fecha_desde=fecha_desde
+                        )
+                        representantes.append(representante)
+
+            # Patrón 2: Buscar bloques con etiquetas claras
+            elif ':' in linea:
+                etiqueta = linea.split(':')[0].strip().upper()
+                valor = linea.split(':')[1].strip() if ':' in linea else ""
+
+                # Si encontramos una etiqueta de representante
+                if any(etq in etiqueta for etq in ['REPRESENTANTE', 'NOMBRE/RAZON SOCIAL']):
+                    nombre = valor
+                    dni = ""
+                    cargo = ""
+
+                    # Buscar datos en líneas siguientes
+                    for j in range(i+1, min(len(lineas), i+10)):
+                        siguiente = lineas[j].strip()
+
+                        if ':' in siguiente:
+                            sig_etiqueta = siguiente.split(':')[0].strip().upper()
+                            sig_valor = siguiente.split(':')[1].strip()
+
+                            if 'DNI' in sig_etiqueta or 'NUMERO DOCUMENTO' in sig_etiqueta:
+                                dni_match = re.search(r'\b(\d{8})\b', sig_valor)
+                                if dni_match:
+                                    dni = dni_match.group(1)
+
+                            if 'CARGO' in sig_etiqueta:
+                                cargo = sig_valor.upper()
+
+                            if 'FECHA DESDE' in sig_etiqueta:
+                                fecha_match = re.search(r'\b(\d{2}/\d{2}/\d{4})\b', sig_valor)
+                                if fecha_match:
+                                    fecha_desde = fecha_match.group(1)
+
+                    if nombre and dni:
+                        representante = RepresentanteLegal(
+                            nombre=nombre,
+                            cargo=cargo or "REPRESENTANTE LEGAL",
+                            tipo_doc="DNI",
+                            numero_doc=dni,
+                            fecha_desde=fecha_desde or ""
+                        )
+                        representantes.append(representante)
 
             i += 1
 
-        return representantes
+        # Eliminar duplicados
+        return self._eliminar_duplicados(representantes)
 
     def _procesar_fila_mejorada(self, row_data: List[str]) -> Optional[RepresentanteLegal]:
         """Procesar una fila de tabla mejorada"""
@@ -423,7 +501,7 @@ class SUNATServiceImproved:
 
         for rep in representantes:
             # Crear clave única basada en DNI o nombre
-            clave = rep.numero_documento or rep.nombre
+            clave = rep.numero_doc or rep.nombre
 
             if clave not in vistos:
                 vistos.add(clave)

@@ -136,14 +136,14 @@ async def debug_headers(request: Request):
 class RUCInput(BaseModel):
     ruc: str
 
-# Endpoint de scraping SUNAT (con lazy loading)
+# Endpoint de scraping SUNAT (usando servicio mejorado)
 @app.post("/consultar-ruc")
 async def consultar_ruc_sunat(ruc_input: RUCInput):
     # Docstring convertido a comentario
     ruc = ruc_input.ruc.strip()
-    
-    print(f"🔍 Consultando RUC: {ruc}")
-    
+
+    print(f"🔍 [IMPROVED] Consultando RUC: {ruc}")
+
     # Validación básica
     if not ruc or len(ruc) != 11 or not ruc.isdigit():
         return {
@@ -154,14 +154,38 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
         }
 
     try:
-        # Importar Playwright solo cuando se necesite
-        from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
-        
-        print("📦 Playwright importado dinámicamente")
-        
-        playwright_helper = get_playwright_helper()
-        
-        async with async_playwright() as p:
+        # Usar el servicio mejorado
+        from app.services.sunat_service_improved import sunat_service_improved
+
+        print("📦 Usando servicio SUNAT mejorado")
+
+        # Consultar usando el servicio mejorado
+        empresa_info = await sunat_service_improved.consultar_empresa_completa(ruc)
+
+        # Convertir a formato de respuesta
+        return {
+            "success": True,
+            "data": {
+                "ruc": empresa_info.ruc,
+                "razon_social": empresa_info.razon_social,
+                "estado": empresa_info.estado,
+                "direccion": empresa_info.domicilio_fiscal,
+                "representantes": [
+                    {
+                        "nombre": rep.nombre,
+                        "cargo": rep.cargo,
+                        "tipo_doc": rep.tipo_doc,
+                        "numero_doc": rep.numero_doc,
+                        "fecha_desde": rep.fecha_desde
+                    }
+                    for rep in empresa_info.representantes
+                ],
+                "total_representantes": empresa_info.total_representantes,
+                "fuente": "SUNAT_IMPROVED",
+                "extraccion_exitosa": True
+            },
+            "timestamp": datetime.now().isoformat()
+        }
             # Configuración del navegador optimizada
             print("🔧 Configurando navegador...")
             
