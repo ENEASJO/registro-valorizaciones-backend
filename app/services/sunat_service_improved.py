@@ -59,14 +59,15 @@ class SUNATServiceImproved:
                 # Submit
                 await page.click("#btnAceptar")
 
-                # Esperar más tiempo para que cargue todo
-                await page.wait_for_timeout(5000)
+                # Esperar más tiempo para que cargue todo (SUNAT puede ser lento)
+                await page.wait_for_timeout(8000)
 
                 # Esperar a que aparezca el contenido
                 try:
-                    await page.wait_for_selector('h4, .form-group, table', timeout=10000)
+                    await page.wait_for_selector('h4, .form-group, table', timeout=15000)
+                    logger.info("✅ Página cargada correctamente")
                 except:
-                    logger.warning("Timeout esperando selectores principales")
+                    logger.warning("Timeout esperando selectores principales, continuando igualmente")
 
                 # Extraer datos básicos
                 datos_basicos = await self._extraer_datos_basicos_mejorado(page, ruc)
@@ -141,14 +142,13 @@ class SUNATServiceImproved:
 
         representantes = []
 
-        # Selectores comunes en SUNAT para representantes
+        # Selectores comunes en SUNAT para representantes (actualizados)
         selectores_representantes = [
-            "#formRepLegal .form-group",
-            ".representante-legal",
-            "#representantesLegales table tr",
-            ".table-representantes tr",
-            "[id*='representante']",
-            "[class*='representante']"
+            "table.form-table tbody tr",  # Tabla principal con datos
+            "#tblRepresentantes tbody tr",  # Tabla específica de representantes
+            ".form-table tbody tr",  # Tablas con clase form-table
+            "table:has(th:has-text('Representante')) tbody tr",  # Tabla con encabezado Representante
+            "table:has(th:has-text('Nombre')) tbody tr",  # Tabla con encabezado Nombre
         ]
 
         for selector in selectores_representantes:
@@ -158,12 +158,23 @@ class SUNATServiceImproved:
 
                 for elemento in elementos:
                     try:
-                        texto = await elemento.inner_text()
-                        if self._contiene_info_representante(texto):
-                            representante = self._extraer_representante_de_texto(texto)
+                        # Extraer datos de las celdas de la tabla
+                        celdas = await elemento.query_selector_all('td')
+                        if len(celdas) >= 3:  # Mínimo 3 celdas (nombre, cargo, documento)
+                            row_data = []
+                            for celda in celdas:
+                                cell_text = await celda.inner_text()
+                                row_data.append(cell_text.strip())
+
+                            logger.info(f"📋 Fila encontrada: {row_data}")
+
+                            # Procesar la fila como representante
+                            representante = self._procesar_fila_representante(row_data)
                             if representante:
                                 representantes.append(representante)
-                    except:
+                                logger.info(f"✅ Representante extraído: {representante.nombre}")
+                    except Exception as e:
+                        logger.warning(f"Error procesando elemento: {e}")
                         continue
 
                 if representantes:
@@ -173,6 +184,61 @@ class SUNATServiceImproved:
                 continue
 
         return representantes
+
+    def _procesar_fila_representante(self, row_data: List[str]) -> Optional[RepresentanteLegal]:
+        """Procesar una fila de tabla de representantes"""
+        if not row_data or len(row_data) < 3:
+            return None
+
+        nombre = ""
+        cargo = ""
+        tipo_doc = ""
+        numero_doc = ""
+        fecha_desde = ""
+
+        # Procesar según el número de columnas
+        if len(row_data) >= 5:
+            # Formato completo: Nombre, Cargo, Tipo Doc, Número Doc, Fecha
+            nombre = row_data[0]
+            cargo = row_data[1]
+            tipo_doc = row_data[2]
+            numero_doc = row_data[3]
+            fecha_desde = row_data[4]
+        elif len(row_data) >= 4:
+            # Formato sin fecha: Nombre, Cargo, Tipo Doc, Número Doc
+            nombre = row_data[0]
+            cargo = row_data[1]
+            tipo_doc = row_data[2]
+            numero_doc = row_data[3]
+        elif len(row_data) >= 3:
+            # Formato mínimo: Nombre, Cargo, Documento
+            nombre = row_data[0]
+            cargo = row_data[1]
+            # El tercer campo podría ser DNI o número completo
+            if row_data[2].isdigit():
+                numero_doc = row_data[2]
+                tipo_doc = "DNI"
+            else:
+                # Buscar DNI en el texto
+                dni_match = re.search(r'\b\d{8}\b', row_data[2])
+                if dni_match:
+                    numero_doc = dni_match.group()
+                    tipo_doc = "DNI"
+
+        # Validar datos mínimos
+        if not nombre or len(nombre) < 5:
+            return None
+
+        # Limpiar nombre
+        nombre = re.sub(r'\s+', ' ', nombre).strip()
+
+        return RepresentanteLegal(
+            nombre=nombre,
+            cargo=cargo or "No especificado",
+            tipo_doc=tipo_doc or "DNI",
+            numero_doc=numero_doc,
+            fecha_desde=fecha_desde or ""
+        )
 
     async def _metodo_tablas_mejorado(self, page) -> List[RepresentanteLegal]:
         """Método 2: Buscar en tablas con criterios mejorados"""
