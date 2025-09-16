@@ -72,6 +72,39 @@ class SUNATServiceImproved:
                 # Extraer datos básicos
                 datos_basicos = await self._extraer_datos_basicos_mejorado(page, ruc)
 
+                # Buscar y hacer clic en el botón de representantes legales
+                logger.info("🔍 Buscando botón de representantes legales...")
+                try:
+                    # Buscar el botón por diferentes selectores
+                    btn_selectors = [
+                        ".btnInfRepLeg",  # Clase específica de SUNAT
+                        "button:has-text('Representante')",
+                        "button:has-text('Representante(s) Legal(es)')",
+                        "[onclick*='representante']",
+                        ".btn-representante",
+                        "button:has-text('Ver Representantes')"
+                    ]
+
+                    btn_clicked = False
+                    for selector in btn_selectors:
+                        try:
+                            btn = await page.query_selector(selector)
+                            if btn:
+                                logger.info(f"✅ Botón encontrado con selector: {selector}")
+                                await btn.click()
+                                btn_clicked = True
+                                # Esperar a que cargue el modal/panel
+                                await page.wait_for_timeout(3000)
+                                break
+                        except:
+                            continue
+
+                    if not btn_clicked:
+                        logger.info("ℹ️ No se encontró botón de representantes (puede que no haya)")
+
+                except Exception as e:
+                    logger.warning(f"Error buscando botón de representantes: {e}")
+
                 # Extraer representantes con métodos mejorados
                 representantes = await self._extraer_representantes_mejorado(page, ruc)
 
@@ -149,6 +182,11 @@ class SUNATServiceImproved:
             ".form-table tbody tr",  # Tablas con clase form-table
             "table:has(th:has-text('Representante')) tbody tr",  # Tabla con encabezado Representante
             "table:has(th:has-text('Nombre')) tbody tr",  # Tabla con encabezado Nombre
+            # Selectores para modal/panel de representantes
+            ".modal table tbody tr",  # Tabla dentro de modal
+            ".panel table tbody tr",  # Tabla dentro de panel
+            "[style*='display: block'] table tbody tr",  # Tabla en elemento visible
+            ".dataTable tbody tr",  # Tabla con clase dataTable
         ]
 
         for selector in selectores_representantes:
