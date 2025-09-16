@@ -1,0 +1,522 @@
+"""
+Servicio SUNAT mejorado con métodos avanzados para extraer representantes legales
+"""
+import logging
+import re
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+
+from app.models.ruc import EmpresaInfo, RepresentanteLegal
+from app.utils.exceptions import ValidationException, ExtractionException
+from app.utils.playwright_helper import get_browser_launch_options
+
+logger = logging.getLogger(__name__)
+
+
+class SUNATServiceImproved:
+    """Servicio SUNAT mejorado con métodos robustos para extraer representantes"""
+
+    def __init__(self):
+        self.base_url = "https://e-consultaruc.sunat.gob.pe/cl-ti-itmrconsruc/FrameCriterioBusquedaWeb.jsp"
+        self.timeout = 45000  # Aumentado a 45 segundos
+
+    async def consultar_empresa_completa(self, ruc: str) -> EmpresaInfo:
+        """Consulta información completa incluyendo representantes mejorados"""
+        logger.info(f"=== INICIANDO CONSULTA SUNAT MEJORADA PARA RUC: {ruc} ===")
+
+        if not self._validar_ruc(ruc):
+            raise ValidationException(f"RUC inválido: {ruc}")
+
+        async with async_playwright() as p:
+            try:
+                launch_options = get_browser_launch_options(headless=True)
+                browser = await p.chromium.launch(**launch_options)
+
+                page = await browser.new_page(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    viewport={'width': 1280, 'height': 720}
+                )
+
+                logger.info("Navegando a SUNAT...")
+                await page.goto(self.base_url, timeout=self.timeout)
+
+                # Llenar formulario
+                await page.fill("#txtRuc", ruc)
+                await page.wait_for_timeout(1500)
+
+                # Verificar CAPTCHA
+                captcha_required = await self._verificar_captcha(page)
+                if captcha_required:
+                    logger.warning("CAPTCHA detectado - usando métodos alternativos")
+
+                # Submit
+                await page.click("#btnAceptar")
+
+                # Esperar más tiempo para que cargue todo
+                await page.wait_for_timeout(5000)
+
+                # Esperar a que aparezca el contenido
+                try:
+                    await page.wait_for_selector('h4, .form-group, table', timeout=10000)
+                except:
+                    logger.warning("Timeout esperando selectores principales")
+
+                # Extraer datos básicos
+                datos_basicos = await self._extraer_datos_basicos_mejorado(page, ruc)
+
+                # Extraer representantes con métodos mejorados
+                representantes = await self._extraer_representantes_mejorado(page, ruc)
+
+                empresa_info = EmpresaInfo(
+                    ruc=ruc,
+                    razon_social=datos_basicos.get("razon_social", ""),
+                    domicilio_fiscal=datos_basicos.get("direccion", ""),
+                    estado=datos_basicos.get("estado", "ACTIVO"),
+                    representantes=representantes,
+                    total_representantes=len(representantes)
+                )
+
+                logger.info(f"✅ Consulta SUNAT mejorada completada: {len(representantes)} representantes")
+                await browser.close()
+                return empresa_info
+
+            except Exception as e:
+                logger.error(f"Error en consulta SUNAT mejorada: {str(e)}")
+                if 'browser' in locals():
+                    await browser.close()
+                raise ExtractionException(f"Error consultando SUNAT: {str(e)}")
+
+    async def _extraer_representantes_mejorado(self, page, ruc: str) -> List[RepresentanteLegal]:
+        """Método mejorado para extraer representantes"""
+        logger.info("🔍 Iniciando extracción mejorada de representantes...")
+
+        representantes = []
+
+        try:
+            # Esperar más tiempo para que cargue el contenido dinámico
+            await page.wait_for_timeout(3000)
+
+            # Método 1: Buscar por selectores específicos de SUNAT
+            representantes.extend(await self._metodo_selectores_especificos(page))
+
+            # Método 2: Buscar en tablas con criterios mejorados
+            if not representantes:
+                representantes.extend(await self._metodo_tablas_mejorado(page))
+
+            # Método 3: Análisis de HTML con patrones específicos
+            if not representantes:
+                representantes.extend(await self._metodo_html_patterns(page))
+
+            # Método 4: Búsqueda avanzada por texto
+            if not representantes:
+                page_text = await page.inner_text('body')
+                representantes.extend(self._metodo_texto_avanzado(page_text))
+
+            # Eliminar duplicados
+            representantes = self._eliminar_duplicados(representantes)
+
+            logger.info(f"✅ Total de {len(representantes)} representantes únicos encontrados")
+
+            if not representantes:
+                logger.warning("⚠️ No se encontraron representantes - revisando estructura de página...")
+                await self._debug_estructura_pagina(page)
+
+        except Exception as e:
+            logger.error(f"Error en extracción mejorada: {e}")
+
+        return representantes
+
+    async def _metodo_selectores_especificos(self, page) -> List[RepresentanteLegal]:
+        """Método 1: Buscar con selectores específicos de SUNAT"""
+        logger.info("📋 Método 1: Buscando con selectores específicos...")
+
+        representantes = []
+
+        # Selectores comunes en SUNAT para representantes
+        selectores_representantes = [
+            "#formRepLegal .form-group",
+            ".representante-legal",
+            "#representantesLegales table tr",
+            ".table-representantes tr",
+            "[id*='representante']",
+            "[class*='representante']"
+        ]
+
+        for selector in selectores_representantes:
+            try:
+                elementos = await page.query_selector_all(selector)
+                logger.info(f"Selector '{selector}' encontró {len(elementos)} elementos")
+
+                for elemento in elementos:
+                    try:
+                        texto = await elemento.inner_text()
+                        if self._contiene_info_representante(texto):
+                            representante = self._extraer_representante_de_texto(texto)
+                            if representante:
+                                representantes.append(representante)
+                    except:
+                        continue
+
+                if representantes:
+                    break
+
+            except:
+                continue
+
+        return representantes
+
+    async def _metodo_tablas_mejorado(self, page) -> List[RepresentanteLegal]:
+        """Método 2: Buscar en tablas con criterios mejorados"""
+        logger.info("📊 Método 2: Buscando en tablas...")
+
+        representantes = []
+
+        tables = await page.query_selector_all('table')
+        logger.info(f"Analizando {len(tables)} tablas...")
+
+        for i, table in enumerate(tables):
+            try:
+                # Obtener HTML completo de la tabla
+                table_html = await table.inner_html()
+                table_text = await table.inner_text()
+
+                # Criterios más específicos
+                if any(keyword in table_text.upper() for keyword in [
+                    "REPRESENTANTE LEGAL", "GERENTE GENERAL", "DIRECTOR",
+                    "APODERADO", "ADMINISTRADOR", "PRESIDENTE"
+                ]):
+                    logger.info(f"Tabla {i} parece contener representantes")
+
+                    # Extraer filas
+                    rows = await table.query_selector_all('tr')
+
+                    for row in rows[1:]:  # Saltar header
+                        cells = await row.query_selector_all('td')
+                        if len(cells) >= 2:
+                            row_data = []
+                            for cell in cells:
+                                cell_text = await cell.inner_text()
+                                row_data.append(cell_text.strip())
+
+                            representante = self._procesar_fila_mejorada(row_data)
+                            if representante:
+                                representantes.append(representante)
+
+            except Exception as e:
+                logger.warning(f"Error procesando tabla {i}: {e}")
+                continue
+
+        return representantes
+
+    async def _metodo_html_patterns(self, page) -> List[RepresentanteLegal]:
+        """Método 3: Análisis de HTML con patrones específicos"""
+        logger.info("🔍 Método 3: Analizando HTML con patrones...")
+
+        representantes = []
+
+        # Obtener HTML completo
+        html_content = await page.content()
+
+        # Patrones para encontrar información de representantes
+        patrones = [
+            # Patrón 1: Tabla con representante legal
+            r'<table[^>]*>.*?representante.*?</table>',
+            # Patrón 2: Div con representante
+            r'<div[^>]*class="[^"]*representante[^"]*"[^>]*>(.*?)</div>',
+            # Patrón 3: Fila de tabla con DNI y nombre
+            r'<tr[^>]*>.*?<td[^>]*>\s*(\d{8})\s*</td>.*?<td[^>]*>\s*([A-ZÁÉÍÓÚÑ\s,]+)\s*</td>',
+            # Patrón 4: Gerente general específico
+            r'gerente general.*?<strong[^>]*>([A-ZÁÉÍÓÚÑ\s,]+)</strong>',
+        ]
+
+        for pattern in patrones:
+            try:
+                matches = re.findall(pattern, html_content, re.IGNORECASE | re.DOTALL)
+                logger.info(f"Patrón encontrado {len(matches)} coincidencias")
+
+                for match in matches:
+                    if isinstance(match, tuple):
+                        # Es el patrón con DNI y nombre
+                        dni, nombre = match
+                        representante = RepresentanteLegal(
+                            nombre=nombre.strip(),
+                            cargo="GERENTE GENERAL",
+                            tipo_doc="DNI",
+                            numero_doc=dni.strip(),
+                            fecha_desde=""
+                        )
+                        representantes.append(representante)
+                    else:
+                        # Extraer del texto completo
+                        representante = self._extraer_representante_de_texto(match)
+                        if representante:
+                            representantes.append(representante)
+
+                if representantes:
+                    break
+
+            except Exception as e:
+                logger.warning(f"Error con patrón {pattern}: {e}")
+                continue
+
+        return representantes
+
+    def _metodo_texto_avanzado(self, texto: str) -> List[RepresentanteLegal]:
+        """Método 4: Búsqueda avanzada por texto"""
+        logger.info("📝 Método 4: Búsqueda avanzada en texto...")
+
+        representantes = []
+        lineas = texto.split('\n')
+
+        # Buscar patrones específicos de SUNAT
+        i = 0
+        while i < len(lineas):
+            linea = lineas[i].strip()
+
+            # Patrón: Nombre completo en mayúsculas
+            if (len(linea) > 20 and
+                linea.isupper() and
+                any(char.isalpha() for char in linea) and
+                not any(kw in linea for kw in ['RUC:', 'FECHA:', 'ESTADO:', 'DIRECCIÓN:'])):
+
+                # Buscar DNI en líneas cercanas
+                dni = ""
+                cargo = ""
+
+                # Buscar en 3 líneas antes y después
+                for j in range(max(0, i-3), min(len(lineas), i+4)):
+                    if j == i:
+                        continue
+
+                    linea_busqueda = lineas[j].strip()
+
+                    # Buscar DNI
+                    dni_match = re.search(r'\b\d{8}\b', linea_busqueda)
+                    if dni_match:
+                        dni = dni_match.group()
+
+                    # Buscar cargo
+                    if any(cargo_kw in linea_busqueda.upper() for cargo_kw in [
+                        'GERENTE GENERAL', 'GERENTE', 'DIRECTOR', 'ADMINISTRADOR',
+                        'REPRESENTANTE LEGAL', 'PRESIDENTE', 'APODERADO'
+                    ]):
+                        cargo = linea_busqueda.strip()
+
+                # Si encontramos al menos nombre y DNI o cargo
+                if dni or cargo:
+                    representante = RepresentanteLegal(
+                        nombre=linea,
+                        cargo=cargo or "REPRESENTANTE LEGAL",
+                        tipo_doc="DNI",
+                        numero_doc=dni,
+                        fecha_desde=""
+                    )
+                    representantes.append(representante)
+
+            i += 1
+
+        return representantes
+
+    def _procesar_fila_mejorada(self, row_data: List[str]) -> Optional[RepresentanteLegal]:
+        """Procesar una fila de tabla mejorada"""
+        if not row_data or len(row_data) < 2:
+            return None
+
+        nombre = ""
+        cargo = ""
+        dni = ""
+
+        # Buscar en cada celda
+        for data in row_data:
+            data = data.strip()
+            if not data:
+                continue
+
+            # Buscar DNI
+            dni_match = re.search(r'\b\d{8}\b', data)
+            if dni_match:
+                dni = dni_match.group()
+                continue
+
+            # Buscar nombre (texto largo con letras)
+            if (len(data) > 10 and
+                any(char.isalpha() for char in data) and
+                not any(kw in data.upper() for kw in ['RUC', 'FECHA', 'ESTADO'])):
+                nombre = data
+                continue
+
+            # Buscar cargo
+            if any(cargo_kw in data.upper() for cargo_kw in [
+                'GERENTE', 'DIRECTOR', 'ADMINISTRADOR', 'REPRESENTANTE',
+                'PRESIDENTE', 'APODERADO'
+            ]):
+                cargo = data
+
+        # Crear representante si tenemos suficiente información
+        if nombre and (dni or cargo):
+            return RepresentanteLegal(
+                nombre=nombre,
+                cargo=cargo or "REPRESENTANTE LEGAL",
+                tipo_doc="DNI",
+                numero_doc=dni,
+                fecha_desde=""
+            )
+
+        return None
+
+    def _extraer_representante_de_texto(self, texto: str) -> Optional[RepresentanteLegal]:
+        """Extraer representante de un bloque de texto"""
+        try:
+            # Buscar DNI
+            dni_match = re.search(r'\b\d{8}\b', texto)
+            dni = dni_match.group() if dni_match else ""
+
+            # Buscar nombre (texto largo)
+            lineas = texto.split('\n')
+            nombre = ""
+            cargo = ""
+
+            for linea in lineas:
+                linea = linea.strip()
+                if len(linea) > 15 and linea.isupper() and any(char.isalpha() for char in linea):
+                    if not any(kw in linea for kw in ['RUC:', 'FECHA:', 'ESTADO:', 'DIRECCIÓN:']):
+                        nombre = linea
+
+                if any(cargo_kw in linea.upper() for cargo_kw in [
+                    'GERENTE', 'DIRECTOR', 'ADMINISTRADOR', 'REPRESENTANTE'
+                ]):
+                    cargo = linea
+
+            if nombre and (dni or cargo):
+                return RepresentanteLegal(
+                    nombre=nombre,
+                    cargo=cargo or "REPRESENTANTE LEGAL",
+                    tipo_doc="DNI",
+                    numero_doc=dni,
+                    fecha_desde=""
+                )
+
+        except Exception as e:
+            logger.warning(f"Error extrayendo representante de texto: {e}")
+
+        return None
+
+    def _contiene_info_representante(self, texto: str) -> bool:
+        """Verificar si un texto contiene información de representante"""
+        texto_upper = texto.upper()
+
+        # Debe tener nombre y alguna indicación de cargo o DNI
+        tiene_nombre = len(texto) > 20 and any(char.isalpha() for char in texto)
+        tiene_cargo = any(kw in texto_upper for kw in [
+            'GERENTE', 'DIRECTOR', 'ADMINISTRADOR', 'REPRESENTANTE',
+            'PRESIDENTE', 'APODERADO'
+        ])
+        tiene_dni = bool(re.search(r'\b\d{8}\b', texto))
+
+        return tiene_nombre and (tiene_cargo or tiene_dni)
+
+    def _eliminar_duplicados(self, representantes: List[RepresentanteLegal]) -> List[RepresentanteLegal]:
+        """Eliminar duplicados basado en DNI o nombre"""
+        unicos = []
+        vistos = set()
+
+        for rep in representantes:
+            # Crear clave única basada en DNI o nombre
+            clave = rep.numero_documento or rep.nombre
+
+            if clave not in vistos:
+                vistos.add(clave)
+                unicos.append(rep)
+
+        return unicos
+
+    async def _extraer_datos_basicos_mejorado(self, page, ruc: str) -> Dict[str, str]:
+        """Extraer datos básicos mejorado"""
+        datos = {
+            "razon_social": "No disponible",
+            "estado": "ACTIVO",
+            "direccion": "No disponible"
+        }
+
+        try:
+            # Esperar a que cargue el contenido
+            await page.wait_for_timeout(2000)
+
+            # Buscar razón social en h4
+            h4_elements = await page.query_selector_all('h4')
+            for h4 in h4_elements:
+                text = await h4.inner_text()
+                text = text.strip()
+
+                if " - " in text and text.startswith(ruc):
+                    parts = text.split(" - ", 1)
+                    if len(parts) >= 2:
+                        datos["razon_social"] = parts[1].strip()
+                        break
+
+            # Buscar dirección y estado
+            texto_completo = await page.inner_text('body')
+
+            # Buscar estado
+            if "ACTIVO" in texto_completo.upper():
+                datos["estado"] = "ACTIVO"
+            elif "INACTIVO" in texto_completo.upper():
+                datos["estado"] = "INACTIVO"
+
+            # Buscar dirección (patrones mejorados)
+            direccion_patterns = [
+                r'Dirección:\s*(.+)',
+                r'Domicilio:\s*(.+)',
+                r'AV\.\s*[A-ZÁÉÍÓÚÑ\s]+',
+                r'JR\.\s*[A-ZÁÉÍÓÚÑ\s]+',
+                r'CALLE\s*[A-ZÁÉÍÓÚÑ\s]+\s*'
+            ]
+
+            for pattern in direccion_patterns:
+                match = re.search(pattern, texto_completo, re.IGNORECASE)
+                if match:
+                    datos["direccion"] = match.group(1).strip() if match.group(1) else match.group(0).strip()
+                    break
+
+        except Exception as e:
+            logger.warning(f"Error extrayendo datos básicos: {e}")
+
+        return datos
+
+    async def _verificar_captcha(self, page) -> bool:
+        """Verificar si hay CAPTCHA"""
+        captcha_selectors = ["#txtCodigo", "#txtCaptcha", "img[src*='captcha']"]
+
+        for selector in captcha_selectors:
+            try:
+                if await page.is_visible(selector, timeout=1000):
+                    return True
+            except:
+                continue
+        return False
+
+    async def _debug_estructura_pagina(self, page):
+        """Depurar estructura de página para análisis"""
+        try:
+            # Guardar screenshot para depuración
+            await page.screenshot(path="/tmp/sunat_debug.png", full_page=True)
+
+            # Guardar HTML
+            html_content = await page.content()
+            with open("/tmp/sunat_debug.html", "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+            logger.info("📸 Debug guardado en /tmp/sunat_debug.png y /tmp/sunat_debug.html")
+        except:
+            pass
+
+    def _validar_ruc(self, ruc: str) -> bool:
+        """Validar RUC"""
+        if not ruc or len(ruc) != 11 or not ruc.isdigit():
+            return False
+        return ruc[:2] in ['10', '20']
+
+
+# Instancia singleton
+sunat_service_improved = SUNATServiceImproved()
