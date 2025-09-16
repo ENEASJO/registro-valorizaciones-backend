@@ -106,13 +106,13 @@ class ConsolidationService:
         return empresa_consolidada
     
     async def _consultar_sunat_safe(self, ruc: str) -> Optional[EmpresaInfo]:
-        """Consultar SUNAT con manejo seguro de errores usando el servicio dedicado SUNAT"""
+        """Consultar SUNAT con manejo seguro de errores usando el servicio mejorado"""
         try:
-            # Usar el servicio dedicado SUNAT que extrae representantes legales
-            from app.services.sunat_service import sunat_service
-            
+            # Usar el servicio mejorado que extrae representantes legales correctamente
+            from app.services.sunat_service_improved import sunat_service_improved
+
             # Consultar empresa completa con representantes
-            empresa_info = await sunat_service.consultar_empresa_completa(ruc)
+            empresa_info = await sunat_service_improved.consultar_empresa_completa(ruc)
             
             logger.info(f"✅ SUNAT: Datos completos obtenidos exitosamente para RUC {ruc}")
             logger.info(f"   📋 {len(empresa_info.representantes)} representantes extraídos")
