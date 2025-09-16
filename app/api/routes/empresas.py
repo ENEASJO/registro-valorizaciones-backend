@@ -171,8 +171,8 @@ async def crear_empresa(
             'email': empresa_data.email or '',
             'telefono': empresa_data.celular or '',
             'direccion': empresa_data.direccion or '',
-            'representante_legal': representante_principal.nombre,
-            'dni_representante': representante_principal.numero_documento,
+            'representante_legal': representante_principal.nombre if representante_principal else '',
+            'dni_representante': representante_principal.numero_documento if representante_principal else '',
             'estado': 'ACTIVO',
             'tipo_empresa': 'SAC',
             'categoria_contratista': empresa_data.categoria_contratista
