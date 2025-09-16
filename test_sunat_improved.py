@@ -5,8 +5,10 @@ Script para probar el servicio SUNAT mejorado
 
 import asyncio
 import json
+import pytest
 from app.services.sunat_service_improved import sunat_service_improved
 
+@pytest.mark.asyncio
 async def test_sunat_improved():
     """Probar el servicio SUNAT mejorado"""
 
