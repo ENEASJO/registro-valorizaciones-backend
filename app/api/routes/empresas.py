@@ -189,10 +189,17 @@ async def crear_empresa(
         empresa_data_completa = {
             'ruc': empresa_data.ruc,
             'razon_social': empresa_data.razon_social,
-            'nombre_comercial': empresa_data.nombre_comercial,
+            'nombre_comercial': empresa_data.nombre_comercial or empresa_data.razon_social,
             'email': empresa_data.email or '',
             'telefono': empresa_data.celular or '',
             'direccion': empresa_data.direccion or '',
+            'departamento': empresa_data.departamento or '',
+            'provincia': empresa_data.provincia or '',
+            'distrito': empresa_data.distrito or '',
+            'ubigeo': empresa_data.ubigeo or '',
+            'tipo_empresa': empresa_data.tipo_empresa or 'SAC',
+            'categoria_contratista': empresa_data.categoria_contratista,
+            'estado': empresa_data.estado,
             'representantes': []
         }
 

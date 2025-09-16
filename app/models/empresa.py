@@ -115,22 +115,32 @@ class EmpresaCreateSchema(BaseModel):
     # Datos básicos
     ruc: str = Field(..., description="RUC de 11 dígitos")
     razon_social: str = Field(..., description="Razón social de la empresa")
-    
+    nombre_comercial: Optional[str] = Field(None, description="Nombre comercial de la empresa")
+
     # Contacto
     email: Optional[str] = Field(None, description="Email corporativo")
     celular: Optional[str] = Field(None, description="Teléfono/celular")
     direccion: Optional[str] = Field(None, description="Dirección completa")
-    
+
+    # Ubicación
+    departamento: Optional[str] = Field(None, description="Departamento")
+    provincia: Optional[str] = Field(None, description="Provincia")
+    distrito: Optional[str] = Field(None, description="Distrito")
+    ubigeo: Optional[str] = Field(None, description="Código de ubigeo")
+
+    # Clasificación
+    tipo_empresa: Optional[str] = Field("SAC", description="Tipo de empresa")
+
     # Representantes
     representantes: List[RepresentanteSchema] = Field([], description="Lista de representantes")
     representante_principal_id: int = Field(0, description="Índice del representante principal")
-    
+
     # Estados
     estado: str = Field("ACTIVO", description="Estado de la empresa")
-    
+
     # Categorización
     categoria_contratista: Optional[str] = Field(None, description="Categoría del contratista: EJECUTORA o SUPERVISORA")
-    
+
     # Datos consolidados (solo lectura)
     especialidades_oece: Optional[List[str]] = Field([], description="Especialidades OECE")
     estado_sunat: Optional[str] = Field(None, description="Estado en SUNAT")
