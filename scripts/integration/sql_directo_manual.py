@@ -12,7 +12,10 @@ from psycopg2.extras import RealDictCursor
 import os
 
 # Connection string exactamente como la usa el servicio
-conn_str = "postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require"
+import os
+conn_str = os.environ.get('NEON_CONNECTION_STRING')
+if not conn_str:
+    raise RuntimeError('NEON_CONNECTION_STRING is not set. Configure it before running this integration script.')
 
 def test_sql_query():
     """Probar la consulta exacta que usa listar_empresas"""

@@ -16,6 +16,11 @@ How to run locally
   - Ensure environment variables/secrets are set (e.g., `NEON_CONNECTION_STRING`).
   - `pytest -m integration`
 
+Integration scripts moved out of `tests/`
+- Manual/integration scripts now live in `scripts/integration/`:
+  - `endpoint_manual.py`, `simple_endpoint_manual.py`, `neon_connection_manual.py`, `neon_connection_nested_manual.py`, `sql_directo_manual.py`
+- These scripts are guarded by `if __name__ == "__main__"` and use `NEON_CONNECTION_STRING` from the environment when needed.
+
 GitHub Actions
 - CI workflow (`.github/workflows/ci.yml`) runs unit tests with `-m "not integration"`.
 - Integration workflow (`.github/workflows/integration-tests.yml`) can be triggered manually from the GitHub Actions tab and runs only integration tests.

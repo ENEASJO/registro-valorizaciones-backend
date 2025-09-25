@@ -13,7 +13,10 @@ def main():
         import psycopg2
         from psycopg2.extras import RealDictCursor
         
-        connection_string = 'postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk.sa-east-1.aws.neon.tech/neondb?sslmode=require'
+import os
+connection_string = os.environ.get('NEON_CONNECTION_STRING')
+if not connection_string:
+    raise RuntimeError('NEON_CONNECTION_STRING is not set. Configure it before running this integration script.')
         
         print("🔗 Intentando conectar a Neon...")
         conn = psycopg2.connect(connection_string, cursor_factory=RealDictCursor)
