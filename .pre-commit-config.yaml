@@ -9,14 +9,16 @@ repos:
         files: \.py$
         pass_filenames: false
 
-      - id: check-api-routes
-        name: Check API route types
-        entry: python scripts/check_api_routes.py
-        language: python
-        files: app/api/routes/.*\.py$
+      # Disabled: script missing in repo
+      # - id: check-api-routes
+      #   name: Check API route types
+      #   entry: python scripts/check_api_routes.py
+      #   language: python
+      #   files: app/api/routes/.*\.py$
 
-      - id: no-int-conversion
-        name: Check for int() conversion on UUIDs
-        entry: python scripts/check_uuid_conversion.py
-        language: python
-        files: \.py$
+      # Disabled: script missing in repo
+      # - id: no-int-conversion
+      #   name: Check for int() conversion on UUIDs
+      #   entry: python scripts/check_uuid_conversion.py
+      #   language: python
+      #   files: \.py$
