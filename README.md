@@ -181,17 +181,20 @@ cd backend
 # Crear entorno virtual (recomendado)
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
+# venv\\Scripts\\activate   # Windows
 
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Iniciar servidor
-python main.py
+# Ejecutar servidor de desarrollo (uvicorn)
+uvicorn main:app --reload --port 8000
+
+# O, compatible con Cloud Run (HOST:PORT y logs)
+uvicorn main:app --host 0.0.0.0 --port 8080 --log-level info
 ```
 
 ### Desarrollo Local
-1. **Backend:** `cd backend && python main.py` (puerto 8000)
+1. **Backend:** `cd backend && uvicorn main:app --reload --port 8000`
 2. **Frontend:** `npm run dev` (puerto 5173)
 
 ## 🌐 URLs de Producción

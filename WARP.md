@@ -2,6 +2,9 @@
 
 This file provides guidance to WARP (warp.dev) when working with code in this repository.
 
+Nota: Para pautas del monorepo y comandos combinados FE/BE, consulta el WARP.md raíz:
+REGISTRO DE VALORIZACIONES/WARP.md
+
 Project scope and goals
 - Backend for Registro de Valorizaciones built with FastAPI and Python 3.11.
 - Integrates with Neon (PostgreSQL) and uses Playwright for SUNAT/OSCE data extraction.
@@ -145,50 +148,10 @@ Working effectively in this repo
   sql/*.db
   ```
 
-Frontend (si aplica)
-- Ubicación prevista: frontend/
-- Requisitos: Node.js >= 18
-- Notas importantes:
-  - En este repo existen indicios de frontend (frontend/src/…), pero no se incluye package.json ni configuración de Vite en esta copia. Si el subproyecto no está inicializado, estos comandos no aplicarán hasta que se agreguen esos archivos.
-  - Las variables VITE_* del archivo .env.example están pensadas para el frontend (Vercel/Vite). Crea frontend/.env.local con las claves VITE_* que necesites.
-
-- Comandos comunes (PowerShell)
-  ```bash path=null start=null
-  # Entrar a la carpeta del frontend
-  cd frontend
-
-  # Instalar dependencias (requiere package.json)
-  npm install
-
-  # Correr en desarrollo (Vite por defecto usa el puerto 5173)
-  npm run dev
-
-  # Build de producción (salida típica: dist/)
-  npm run build
-
-  # Correr un test individual (si hay configuración de tests)
-  npm test -- --watch
-  ```
-
-- Variables de entorno (Vite)
-  ```bash path=null start=null
-  # Crea frontend/.env.local con contenido similar:
-  VITE_ENVIRONMENT=development
-  VITE_BACKEND_URL=http://localhost:8000
-  VITE_LOG_LEVEL=error
-
-  # Para producción (Vercel), usa valores del .env.example del repo:
-  VITE_ENVIRONMENT=production
-  VITE_BACKEND_URL=https://registro-valorizaciones-503600768755.southamerica-west1.run.app
-  VITE_API_TIMEOUT=45000
-  VITE_RETRY_ATTEMPTS=2
-  VITE_DEBUG=false
-  ```
-
-- Despliegue (Vercel, según docs del repo)
-  - Root Directory: frontend/
-  - Build Command: npm run build
-  - Output Directory: dist
+Frontend (proyecto hermano)
+- Carpeta hermana: REGISTRO DE VALORIZACIONES/registro-valorizaciones-frontend
+- Revisa su WARP.md y README para comandos y variables de entorno específicas del frontend.
+- Para coordinar FE/BE en local, utiliza el WARP.md raíz del monorepo (REGISTRO DE VALORIZACIONES/WARP.md).
 
 Workflows rápidos en Warp
 - Desarrollo local (dos pestañas/panes)
