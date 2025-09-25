@@ -29,6 +29,7 @@ jobs:
       run: |
         pytest -v -k "not test_endpoint and not test_simple_endpoint and not test_neon_connection and not test_neon_connection_nested and not test_sql_directo"
       env:
+        PYTHONPATH: ${{ github.workspace }}
         NEON_CONNECTION_STRING: postgresql://test:test@localhost:5432/test
 
   deploy:
