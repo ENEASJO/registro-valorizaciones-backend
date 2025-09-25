@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-Script para probar la misma consulta SQL que usa el servicio
+Script para probar la misma consulta SQL que usa el servicio (integración manual).
+Marcado como prueba de integración para excluirlo del CI por defecto.
 """
+
+import pytest
+pytestmark = pytest.mark.integration
 
 import psycopg2
 from psycopg2.extras import RealDictCursor

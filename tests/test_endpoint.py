@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-Script para probar el endpoint POST /api/empresas
-y ver qué está causando el error 500
+Script para probar el endpoint POST /api/empresas (prueba manual/integración).
+Marcado como prueba de integración para que no se ejecute en CI por defecto.
 """
+
+import pytest
+pytestmark = pytest.mark.integration
 
 import requests
 import json
@@ -52,35 +55,39 @@ test_data = {
     "capacidad_contratacion": None
 }
 
-print("🔍 Probando endpoint POST /api/empresas")
-print(f"URL: {BACKEND_URL}")
-print(f"Datos: {json.dumps(test_data, indent=2)}")
-print("\n" + "="*50 + "\n")
+def main():
+    print("🔍 Probando endpoint POST /api/empresas")
+    print(f"URL: {BACKEND_URL}")
+    print(f"Datos: {json.dumps(test_data, indent=2)}")
+    print("\n" + "="*50 + "\n")
 
-try:
-    # Hacer la petición
-    response = requests.post(
-        BACKEND_URL,
-        json=test_data,
-        headers={'Content-Type': 'application/json'},
-        timeout=30
-    )
+    try:
+        # Hacer la petición
+        response = requests.post(
+            BACKEND_URL,
+            json=test_data,
+            headers={'Content-Type': 'application/json'},
+            timeout=30
+        )
 
-    print(f"Status Code: {response.status_code}")
-    print(f"Headers: {dict(response.headers)}")
+        print(f"Status Code: {response.status_code}")
+        print(f"Headers: {dict(response.headers)}")
 
-    if response.status_code == 200:
-        print("\n✅ ÉXITO!")
-        print(f"Response: {json.dumps(response.json(), indent=2)}")
-    else:
-        print(f"\n❌ ERROR {response.status_code}")
-        try:
-            print(f"Response: {response.text}")
-        except:
-            print("No se pudo obtener el cuerpo de la respuesta")
+        if response.status_code == 200:
+            print("\n✅ ÉXITO!")
+            print(f"Response: {json.dumps(response.json(), indent=2)}")
+        else:
+            print(f"\n❌ ERROR {response.status_code}")
+            try:
+                print(f"Response: {response.text}")
+            except Exception:
+                print("No se pudo obtener el cuerpo de la respuesta")
 
-except requests.exceptions.RequestException as e:
-    print(f"❌ Error de conexión: {e}")
-    sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error de conexión: {e}")
+        sys.exit(1)
 
-print("\n" + "="*50)
+    print("\n" + "="*50)
+
+if __name__ == "__main__":
+    main()

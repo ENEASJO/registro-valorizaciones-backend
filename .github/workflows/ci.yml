@@ -25,9 +25,9 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-asyncio httpx
 
-    - name: Run unit tests (exclude manual/integration scripts)
+    - name: Run unit tests (exclude integration)
       run: |
-        pytest -v -k "not test_endpoint and not test_simple_endpoint and not test_neon_connection and not test_neon_connection_nested and not test_sql_directo"
+        pytest -v -m "not integration"
       env:
         PYTHONPATH: ${{ github.workspace }}
         NEON_CONNECTION_STRING: postgresql://test:test@localhost:5432/test
