@@ -73,6 +73,7 @@ async def init_database():
     try:
         # Importar todos los modelos para asegurar que las tablas se creen
         from app.models.empresa import EmpresaDB, RepresentanteDB
+        from app.models.ubicacion import UbicacionDB  # Asegurar creación de tabla ubicaciones
         
         # Crear todas las tablas
         async with engine.begin() as conn:

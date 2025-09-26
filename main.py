@@ -37,6 +37,17 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Cargar router de ubicaciones (San Marcos)
+try:
+    print("📦 Cargando router de ubicaciones...")
+    from app.api.routes.ubicaciones import router as ubicaciones_router
+    app.include_router(ubicaciones_router)
+    print("✅ Router de ubicaciones cargado exitosamente")
+except Exception as e:
+    print(f"⚠️ No se pudo cargar router de ubicaciones: {e}")
+    import traceback
+    traceback.print_exc()
+
 # Cargar router de debug para empresas
 try:
     print("📦 Cargando router de debug de empresas...")
