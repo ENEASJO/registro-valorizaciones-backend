@@ -13,6 +13,7 @@ import re
 class EmpresaDB(Base):
     """Modelo de base de datos para empresas"""
     __tablename__ = "empresas"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     codigo = Column(String(20), unique=True, nullable=False, index=True)
@@ -78,6 +79,7 @@ class EmpresaDB(Base):
 class RepresentanteDB(Base):
     """Modelo de base de datos para representantes de empresas"""
     __tablename__ = "empresa_representantes"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     empresa_id = Column(Integer, ForeignKey("empresas.id"), nullable=False)

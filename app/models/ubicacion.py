@@ -19,4 +19,5 @@ class UbicacionDB(Base):
 
     __table_args__ = (
         Index("ux_ubicaciones_nombre", nombre, unique=True),
+        {'extend_existing': True}
     )
