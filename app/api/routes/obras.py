@@ -7,8 +7,7 @@ from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime
 
-# from app.services.obra_service_turso import ObraServiceTurso
-# TODO: Migrar a servicio Neon cuando esté disponible
+from app.services.obra_service_neon import ObraServiceNeon
 from app.models.obra import ObraCreate, ObraUpdate, ObraResponse, ESTADOS_OBRA
 from app.utils.exceptions import ValidationException
 
@@ -40,7 +39,7 @@ async def crear_obra(obra_data: ObraCreate) -> Dict[str, Any]:
     try:
         logger.info(f"🔄 Creando nueva obra: {obra_data.nombre}")
         
-        obra_creada = await ObraServiceTurso.crear_obra(obra_data)
+        obra_creada = await ObraServiceNeon.crear_obra(obra_data)
         
         respuesta = {
             "success": True,
@@ -82,7 +81,7 @@ async def obtener_obra(obra_id: int) -> Dict[str, Any]:
     Obtener una obra específica por su ID
     """
     try:
-        obra = await ObraServiceTurso.obtener_obra_por_id(obra_id)
+        obra = await ObraServiceNeon.obtener_obra_por_id(obra_id)
         
         if not obra:
             return JSONResponse(
@@ -119,7 +118,7 @@ async def obtener_obra_por_codigo(codigo: str) -> Dict[str, Any]:
     Obtener una obra específica por su código
     """
     try:
-        obra = await ObraServiceTurso.obtener_obra_por_codigo(codigo)
+        obra = await ObraServiceNeon.obtener_obra_por_codigo(codigo)
         
         if not obra:
             return JSONResponse(
@@ -166,7 +165,7 @@ async def listar_obras(
     - **offset**: Número de registros a saltar
     """
     try:
-        obras = await ObraServiceTurso.listar_obras(
+        obras = await ObraServiceNeon.listar_obras(
             empresa_id=empresa_id,
             estado=estado,
             limit=limit,
@@ -202,7 +201,7 @@ async def actualizar_obra(obra_id: int, obra_update: ObraUpdate) -> Dict[str, An
     Actualizar una obra existente
     """
     try:
-        obra_actualizada = await ObraServiceTurso.actualizar_obra(obra_id, obra_update)
+        obra_actualizada = await ObraServiceNeon.actualizar_obra(obra_id, obra_update)
         
         if not obra_actualizada:
             return JSONResponse(
@@ -241,7 +240,7 @@ async def eliminar_obra(obra_id: int) -> Dict[str, Any]:
     """
     try:
         # Verificar que existe
-        obra = await ObraServiceTurso.obtener_obra_por_id(obra_id)
+        obra = await ObraServiceNeon.obtener_obra_por_id(obra_id)
         if not obra:
             return JSONResponse(
                 status_code=404,
@@ -253,7 +252,7 @@ async def eliminar_obra(obra_id: int) -> Dict[str, Any]:
                 }
             )
         
-        success = await ObraServiceTurso.eliminar_obra(obra_id)
+        success = await ObraServiceNeon.eliminar_obra(obra_id)
         
         if success:
             return {
