@@ -11,6 +11,7 @@ from app.models.obra import ObraCreate, ObraUpdate, ObraResponse
 from app.utils.codigo_generator import CodigoGenerator
 from app.core.database import get_database_url
 from app.utils.exceptions import ValidationException
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -38,19 +39,28 @@ class ObraServiceNeon:
             ValidationException: Si hay errores de validación
         """
         try:
-            # Generar código automáticamente
-            codigo = CodigoGenerator.generar_codigo_obra(obra_data.empresa_id)
-            
             conn = await ObraServiceNeon._get_connection()
             try:
+                # Convertir empresa_id a UUID si es string
+                if isinstance(obra_data.empresa_id, str):
+                    empresa_uuid = uuid.UUID(obra_data.empresa_id)
+                else:
+                    empresa_uuid = obra_data.empresa_id
+                    
                 # Verificar que la empresa existe
                 empresa_exists = await conn.fetchval(
-                    "SELECT EXISTS(SELECT 1 FROM empresas WHERE id = $1 AND activo = true)",
-                    obra_data.empresa_id
+                    "SELECT EXISTS(SELECT 1 FROM empresas WHERE id = $1 AND estado = 'ACTIVO')",
+                    empresa_uuid
                 )
                 
                 if not empresa_exists:
-                    raise ValidationException(f"La empresa con ID {obra_data.empresa_id} no existe o está inactiva")
+                    raise ValidationException(f"La empresa con ID {empresa_uuid} no existe o está inactiva")
+                    
+                # Generar código usando la función de base de datos
+                codigo = await conn.fetchval(
+                    "SELECT generar_codigo_obra_uuid($1)",
+                    empresa_uuid
+                )
                 
                 # Calcular monto total
                 monto_contractual = obra_data.monto_contractual or Decimal('0')
@@ -63,26 +73,26 @@ class ObraServiceNeon:
                         codigo, nombre, descripcion, empresa_id, cliente,
                         ubicacion, distrito, provincia, departamento, ubigeo,
                         modalidad_ejecucion, sistema_contratacion, tipo_obra,
-                        monto_contractual, monto_adicionales, monto_total,
+                        monto_contractual, monto_adicionales,
                         fecha_inicio, fecha_fin_contractual, fecha_fin_real,
                         plazo_contractual, plazo_total,
                         estado_obra, porcentaje_avance, observaciones,
-                        activo, created_at, updated_at, version
+                        activo, version
                     ) VALUES (
                         $1, $2, $3, $4, $5,
                         $6, $7, $8, $9, $10,
                         $11, $12, $13,
-                        $14, $15, $16,
-                        $17, $18, $19,
-                        $20, $21,
-                        $22, $23, $24,
-                        true, NOW(), NOW(), 1
+                        $14, $15,
+                        $16, $17, $18,
+                        $19, $20,
+                        $21, $22, $23,
+                        true, 1
                     ) RETURNING id
                 """, 
-                    codigo, obra_data.nombre, obra_data.descripcion, obra_data.empresa_id, obra_data.cliente,
+                    codigo, obra_data.nombre, obra_data.descripcion, empresa_uuid, obra_data.cliente,
                     obra_data.ubicacion, obra_data.distrito, obra_data.provincia, obra_data.departamento, obra_data.ubigeo,
                     obra_data.modalidad_ejecucion, obra_data.sistema_contratacion, obra_data.tipo_obra,
-                    monto_contractual, monto_adicionales, monto_total,
+                    monto_contractual, monto_adicionales,
                     obra_data.fecha_inicio, obra_data.fecha_fin_contractual, obra_data.fecha_fin_real,
                     obra_data.plazo_contractual, obra_data.plazo_total,
                     obra_data.estado_obra, obra_data.porcentaje_avance, obra_data.observaciones
@@ -90,7 +100,7 @@ class ObraServiceNeon:
                 
                 # Obtener la obra creada
                 obra = await conn.fetchrow("""
-                    SELECT o.*, e.nombre as empresa_nombre
+                    SELECT o.*, e.razon_social as empresa_nombre
                     FROM obras o
                     JOIN empresas e ON o.empresa_id = e.id
                     WHERE o.id = $1

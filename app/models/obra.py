@@ -1,17 +1,18 @@
 """
 Modelos Pydantic para obras de construcción
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field, validator
 from datetime import datetime, date
 from decimal import Decimal
+import uuid
 
 class ObraBase(BaseModel):
     """Modelo base para obras"""
     codigo: Optional[str] = Field("", title="Código de Obra", max_length=50)
     nombre: str = Field(..., title="Nombre de la Obra", min_length=1, max_length=500)
     descripcion: Optional[str] = Field(None, title="Descripción")
-    empresa_id: int = Field(..., title="ID de la Empresa Ejecutora")
+    empresa_id: Union[str, uuid.UUID] = Field(..., title="ID de la Empresa Ejecutora")
     cliente: Optional[str] = Field(None, title="Cliente/Propietario", max_length=255)
     
     # Ubicación
@@ -67,7 +68,7 @@ class ObraCreate(BaseModel):
     """Modelo para crear obra - código se genera automáticamente"""
     nombre: str = Field(..., title="Nombre de la Obra", min_length=1, max_length=500)
     descripcion: Optional[str] = Field(None, title="Descripción")
-    empresa_id: int = Field(..., title="ID de la Empresa Ejecutora")
+    empresa_id: Union[str, uuid.UUID] = Field(..., title="ID de la Empresa Ejecutora")
     cliente: Optional[str] = Field(None, title="Cliente/Propietario", max_length=255)
     
     # Ubicación
@@ -129,11 +130,11 @@ class ObraUpdate(BaseModel):
 
 class ObraResponse(ObraBase):
     """Modelo de respuesta para obra"""
-    id: int
-    activo: bool
+    id: Union[str, uuid.UUID]
+    activo: bool = True
     created_at: datetime
     updated_at: datetime
-    version: int
+    version: int = 1
     
     # Información adicional calculada
     dias_transcurridos: Optional[int] = None
