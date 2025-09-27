@@ -1,4 +1,4 @@
-# main.py - Versión con inicio rápido y Playwright lazy
+# main.py - Version con inicio rapido y Playwright lazy
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
