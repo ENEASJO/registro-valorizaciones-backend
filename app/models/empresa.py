@@ -329,7 +329,7 @@ class RepresentanteManualSchema(BaseModel):
     cargo: str = Field(..., min_length=2, max_length=100, title="Cargo en la empresa")
     tipo_documento: str = Field("DNI", title="Tipo de documento")
     numero_documento: str = Field(..., min_length=8, max_length=20, title="Número de documento")
-    es_principal: bool = Field(False, title="¿Es el representante principal?")
+    es_principal: bool = Field(False, title="Es el representante principal?")
     participacion: Optional[str] = Field(None, title="Porcentaje de participación")
     fecha_desde: Optional[str] = Field(None, title="Fecha desde cuando ejerce el cargo")
     estado: str = Field("ACTIVO", title="Estado del representante")

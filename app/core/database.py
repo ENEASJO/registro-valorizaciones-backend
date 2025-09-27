@@ -79,10 +79,10 @@ async def init_database():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             
-        print("✅ Base de datos inicializada correctamente")
+        print("[OK] Base de datos inicializada correctamente")
         
     except Exception as e:
-        print(f"❌ Error inicializando base de datos: {e}")
+        print(f"[ERROR] Error inicializando base de datos: {e}")
         raise
 
 async def close_database():
@@ -93,9 +93,9 @@ async def close_database():
         await engine.dispose()
         if database.is_connected:
             await database.disconnect()
-        print("✅ Conexiones de base de datos cerradas")
+        print("[OK] Conexiones de base de datos cerradas")
     except Exception as e:
-        print(f"⚠️ Error cerrando base de datos: {e}")
+        print(f"[WARNING] Error cerrando base de datos: {e}")
 
 # Context manager para transacciones
 class DatabaseTransaction:

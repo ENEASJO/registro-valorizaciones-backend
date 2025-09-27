@@ -17,56 +17,56 @@ app = FastAPI(
 
 # Cargar router de empresas completo
 try:
-    print("📦 Cargando router de empresas completo...")
+    print("[LOADING] Cargando router de empresas completo...")
     from app.api.routes.empresas import router as empresas_router
     app.include_router(empresas_router)
-    print("✅ Router de empresas completo cargado exitosamente")
+    print("[OK] Router de empresas completo cargado exitosamente")
 except Exception as e:
-    print(f"❌ Error cargando router de empresas completo: {e}")
+    print(f"[ERROR] Error cargando router de empresas completo: {e}")
     import traceback
     traceback.print_exc()
 
 # Cargar router de debug
 try:
-    print("📦 Cargando router de debug...")
+    print("[LOADING] Cargando router de debug...")
     from app.api.routes.debug_logs import router as debug_router
     app.include_router(debug_router, prefix="/api")
-    print("✅ Router de debug cargado exitosamente")
+    print("[OK] Router de debug cargado exitosamente")
 except Exception as e:
-    print(f"❌ Error cargando router de debug: {e}")
+    print(f"[ERROR] Error cargando router de debug: {e}")
     import traceback
     traceback.print_exc()
 
 # Cargar router de ubicaciones (San Marcos)
 try:
-    print("📦 Cargando router de ubicaciones...")
+    print("[LOADING] Cargando router de ubicaciones...")
     from app.api.routes.ubicaciones import router as ubicaciones_router
     app.include_router(ubicaciones_router)
-    print("✅ Router de ubicaciones cargado exitosamente")
+    print("[OK] Router de ubicaciones cargado exitosamente")
 except Exception as e:
-    print(f"⚠️ No se pudo cargar router de ubicaciones: {e}")
+    print(f"[WARNING] No se pudo cargar router de ubicaciones: {e}")
     import traceback
     traceback.print_exc()
 
 # Cargar router de debug para empresas
 try:
-    print("📦 Cargando router de debug de empresas...")
+    print("[LOADING] Cargando router de debug de empresas...")
     from app.api.routes.debug_empresa import router as debug_empresa_router
     app.include_router(debug_empresa_router)
-    print("✅ Router de debug de empresas cargado exitosamente")
+    print("[OK] Router de debug de empresas cargado exitosamente")
 except Exception as e:
-    print(f"❌ Error cargando router de debug de empresas: {e}")
+    print(f"[ERROR] Error cargando router de debug de empresas: {e}")
     import traceback
     traceback.print_exc()
 
 # Cargar router de empresas inteligentes (con fallback manual)
 try:
-    print("📦 Cargando router de empresas inteligentes...")
+    print("[LOADING] Cargando router de empresas inteligentes...")
     from app.api.routes.empresas_smart import router as empresas_smart_router
     app.include_router(empresas_smart_router, prefix="/api")
-    print("✅ Router de empresas inteligentes cargado exitosamente")
+    print("[OK] Router de empresas inteligentes cargado exitosamente")
 except Exception as e:
-    print(f"❌ Error cargando router de empresas inteligentes: {e}")
+    print(f"[ERROR] Error cargando router de empresas inteligentes: {e}")
     import traceback
     traceback.print_exc()
 
@@ -77,11 +77,11 @@ if enable_proxy_middleware:
     try:
         from app.middleware.proxy_headers import ProxyHeadersMiddleware
         app.add_middleware(ProxyHeadersMiddleware)
-        print("✅ Proxy headers middleware configurado para Cloud Run")
+        print("[OK] Proxy headers middleware configurado para Cloud Run")
     except Exception as e:
-        print(f"⚠️ No se pudo cargar middleware de proxy headers: {e}")
+        print(f"[WARNING] No se pudo cargar middleware de proxy headers: {e}")
 else:
-    print("ℹ️ Proxy headers middleware deshabilitado")
+    print("[INFO] Proxy headers middleware deshabilitado")
 
 # CORS básico - DEBE ESTAR DESPUÉS DEL MIDDLEWARE DE PROXY
 app.add_middleware(
@@ -97,10 +97,10 @@ app.add_middleware(
 async def startup_event():
     # Docstring convertido a comentario
     try:
-        print("🚀 Iniciando aplicación FastAPI...")
-        print("✅ Startup completado exitosamente")
+        print("[STARTING] Iniciando aplicación FastAPI...")
+        print("[OK] Startup completado exitosamente")
     except Exception as e:
-        print(f"❌ Error crítico en startup: {e}")
+        print(f"[ERROR] Error crítico en startup: {e}")
         import traceback
         traceback.print_exc()
 
@@ -114,17 +114,17 @@ def get_playwright_helper():
         try:
             from app.utils.playwright_helper import get_browser_launch_options
             _playwright_helper = get_browser_launch_options
-            print("🌐 Playwright helper cargado dinámicamente")
+            print("[WEB] Playwright helper cargado dinámicamente")
         except ImportError:
             _playwright_helper = False
-            print("⚠️ Playwright helper no disponible")
+            print("[WARNING] Playwright helper no disponible")
     return _playwright_helper
 
 # Endpoints que arrancan inmediatamente
 @app.get("/")
 async def root():
     return {
-        "message": "API de Valorizaciones - Inicio Rápido ⚡",
+        "message": "API de Valorizaciones - Inicio Rapido",
         "status": "OK",
         "fast_start": True,
         "routers_loaded": True,
@@ -162,7 +162,7 @@ class RUCInput(BaseModel):
 @app.post("/consultar-ruc")
 async def consultar_ruc_sunat(ruc_input: RUCInput):
     """Endpoint para consultar RUC usando el servicio SUNAT mejorado"""
-    print(f"🔍 [IMPROVED] Consultando RUC: {ruc_input.ruc}")
+    print(f"[SEARCH] [IMPROVED] Consultando RUC: {ruc_input.ruc}")
 
     # Validación básica
     ruc = ruc_input.ruc.strip()
@@ -207,7 +207,7 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
         }
 
     except Exception as e:
-        print(f"❌ Error en consulta SUNAT mejorada: {e}")
+        print(f"[ERROR] Error en consulta SUNAT mejorada: {e}")
         return {
             "success": False,
             "error": True,
@@ -219,7 +219,7 @@ async def consultar_ruc_sunat(ruc_input: RUCInput):
 @app.get("/consulta-ruc-consolidada/{ruc}")
 async def consultar_ruc_consolidado(ruc: str):
     # Docstring convertido a comentario
-    print(f"🔍 Iniciando consulta consolidada para RUC: {ruc}")
+    print(f"[SEARCH] Iniciando consulta consolidada para RUC: {ruc}")
     
     # Validación básica
     if not ruc or len(ruc) != 11 or not ruc.isdigit():
@@ -234,7 +234,7 @@ async def consultar_ruc_consolidado(ruc: str):
         # Importar el servicio de consolidación dinámicamente
         from app.services.consolidation_service import ConsolidationService
         
-        print("📦 Servicio de consolidación importado dinámicamente")
+        print("[LOADING] Servicio de consolidación importado dinámicamente")
         
         # Crear instancia del servicio
         consolidation_service = ConsolidationService()
@@ -242,11 +242,11 @@ async def consultar_ruc_consolidado(ruc: str):
         # Consultar datos consolidados
         resultado_consolidado = await consolidation_service.consultar_consolidado(ruc)
         
-        print("✅ Consulta consolidada completada exitosamente")
+        print("[OK] Consulta consolidada completada exitosamente")
         
         # If SUNAT data is missing from consolidation, use fallback
         if not resultado_consolidado.razon_social or not resultado_consolidado.fuentes_consultadas or "SUNAT" not in resultado_consolidado.fuentes_consultadas:
-            print("🔄 SUNAT data missing from consolidation, using fallback...")
+            print("[REFRESH] SUNAT data missing from consolidation, using fallback...")
             try:
                 # Get SUNAT data directly
                 ruc_input = RUCInput(ruc=ruc)
@@ -287,7 +287,7 @@ async def consultar_ruc_consolidado(ruc: str):
                         "timestamp": datetime.now().isoformat()
                     }
             except Exception as fallback_error:
-                print(f"⚠️ Fallback SUNAT también falló: {fallback_error}")
+                print(f"[WARNING] Fallback SUNAT también falló: {fallback_error}")
         
         # Return original consolidation result
         return {
@@ -323,7 +323,7 @@ async def consultar_ruc_consolidado(ruc: str):
         }
         
     except ImportError as import_error:
-        print(f"⚠️ Error importando servicio de consolidación: {import_error}")
+        print(f"[WARNING] Error importando servicio de consolidación: {import_error}")
         # Fallback al endpoint SUNAT simple si no está disponible la consolidación
         ruc_input = RUCInput(ruc=ruc)
         resultado_simple = await consultar_ruc_sunat(ruc_input)
@@ -331,7 +331,7 @@ async def consultar_ruc_consolidado(ruc: str):
         return resultado_simple
         
     except Exception as e:
-        print(f"❌ Error en consulta consolidada: {e}")
+        print(f"[ERROR] Error en consulta consolidada: {e}")
         return {
             "success": False,
             "error": True,
@@ -345,7 +345,7 @@ async def test_playwright():
     # Docstring convertido a comentario
     try:
         from playwright.async_api import async_playwright
-        print("📦 Playwright importado para test")
+        print("[LOADING] Playwright importado para test")
         
         playwright_helper = get_playwright_helper()
         
@@ -389,14 +389,14 @@ async def test_playwright():
 @app.get("/api/empresas")
 async def listar_empresas():
     # Listar empresas desde Neon PostgreSQL
-    print("📋 Listando empresas desde Neon...")
+    print(" Listando empresas desde Neon...")
     
     try:
         from app.services.empresa_service_neon import empresa_service_neon
         
         empresas = empresa_service_neon.listar_empresas()
         
-        print(f"✅ Encontradas {len(empresas)} empresas en Neon")
+        print(f"[OK] Encontradas {len(empresas)} empresas en Neon")
         return {
             "success": True,
             "data": empresas,
@@ -406,10 +406,10 @@ async def listar_empresas():
         }
             
     except Exception as e:
-        print(f"❌ Error listando desde Neon: {e}")
+        print(f"[ERROR] Error listando desde Neon: {e}")
         # # Fallback a Supabase si falla Neon - DESHABILITADO
         # try:
-        #     print(f"✅ Fallback Supabase: {len(empresas)} empresas")
+        #     print(f"[OK] Fallback Supabase: {len(empresas)} empresas")
         #     return {
         #         "success": True,
         #         "data": empresas,
@@ -421,7 +421,7 @@ async def listar_empresas():
             try:
                 from app.services.empresa_service_simple import empresa_service_simple
                 empresas = empresa_service_simple.listar_empresas()
-                print(f"✅ Fallback Turso final: {len(empresas)} empresas")
+                print(f"[OK] Fallback Turso final: {len(empresas)} empresas")
                 return {
                     "success": True,
                     "data": empresas,
@@ -430,7 +430,7 @@ async def listar_empresas():
                     "timestamp": datetime.now().isoformat()
                 }
             except Exception as turso_error:
-                print(f"❌ Todos los fallbacks fallaron: {turso_error}")
+                print(f"[ERROR] Todos los fallbacks fallaron: {turso_error}")
                 return {
                     "success": True,
                     "data": [],
@@ -513,7 +513,7 @@ async def test_consolidacion_mejorada(ruc_input: RUCInput):
     """Endpoint de prueba para la consolidación mejorada con representantes"""
     ruc = ruc_input.ruc.strip()
     
-    print(f"🧪 TESTING: Consolidación mejorada para RUC: {ruc}")
+    print(f" TESTING: Consolidación mejorada para RUC: {ruc}")
     
     try:
         from app.services.consolidation_service import consolidation_service
@@ -562,7 +562,7 @@ async def test_consolidacion_mejorada(ruc_input: RUCInput):
         }
         
     except ImportError as e:
-        print(f"⚠️ Error importando servicio de consolidación: {e}")
+        print(f"[WARNING] Error importando servicio de consolidación: {e}")
         return {
             "success": False,
             "error": "Servicio de consolidación no disponible",
@@ -570,7 +570,7 @@ async def test_consolidacion_mejorada(ruc_input: RUCInput):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        print(f"❌ Error en consolidación mejorada: {e}")
+        print(f"[ERROR] Error en consolidación mejorada: {e}")
         return {
             "success": False,
             "error": str(e),
@@ -580,13 +580,13 @@ async def test_consolidacion_mejorada(ruc_input: RUCInput):
 
 # # ENDPOINTS DE PRUEBA SUPABASE - DESHABILITADOS
 #     # Crear empresa en Supabase (prueba)
-#     print(f"📝 [SUPABASE] Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
+#     print(f" [SUPABASE] Creando empresa: {data.get('ruc', 'N/A')} - {data.get('razon_social', 'N/A')}")
 #     
 #     try:
 #         
 #         
 #         if empresa_id:
-#             print(f"✅ [SUPABASE] Empresa guardada con ID: {empresa_id}")
+#             print(f"[OK] [SUPABASE] Empresa guardada con ID: {empresa_id}")
 #             return {
 #                 "success": True,
 #                 "data": {"id": empresa_id, **data},
@@ -594,7 +594,7 @@ async def test_consolidacion_mejorada(ruc_input: RUCInput):
 #                 "timestamp": datetime.now().isoformat()
 #             }
 #         else:
-#             print("⚠️ [SUPABASE] Error guardando empresa")
+#             print("[WARNING] [SUPABASE] Error guardando empresa")
 #             return {
 #                 "success": False,
 #                 "data": data,
@@ -603,7 +603,7 @@ async def test_consolidacion_mejorada(ruc_input: RUCInput):
 #             }
 #             
 #     except Exception as e:
-#         print(f"❌ [SUPABASE] Error: {e}")
+#         print(f"[ERROR] [SUPABASE] Error: {e}")
 #         return {
 #             "success": False,
 #             "error": str(e),
@@ -612,12 +612,12 @@ async def test_consolidacion_mejorada(ruc_input: RUCInput):
 #         }
 # 
 #     # Listar empresas desde Supabase (prueba)
-#     print("📋 [SUPABASE] Listando empresas...")
+#     print(" [SUPABASE] Listando empresas...")
 #     
 #     try:
 #         
 #         
-#         print(f"✅ [SUPABASE] Encontradas {len(empresas)} empresas")
+#         print(f"[OK] [SUPABASE] Encontradas {len(empresas)} empresas")
 #         return {
 #             "success": True,
 #             "data": empresas,
@@ -627,7 +627,7 @@ async def test_consolidacion_mejorada(ruc_input: RUCInput):
 #         }
 #             
 #     except Exception as e:
-#         print(f"❌ [SUPABASE] Error listando: {e}")
+#         print(f"[ERROR] [SUPABASE] Error listando: {e}")
 #         return {
 #             "success": False,
 #             "data": [],
@@ -676,9 +676,9 @@ async def ejecutar_esquema_temporal():
                 # Usar el servicio de Neon para ejecutar la instrucción
                 # Esto es un workaround - normalmente usaríamos execute_raw directamente
                 result = empresa_service_neon._execute_query(statement + ';')
-                resultados.append(f"✅ Instrucción {i+1}: Ejecutada correctamente")
+                resultados.append(f"[OK] Instrucción {i+1}: Ejecutada correctamente")
             except Exception as e:
-                resultados.append(f"⚠️  Instrucción {i+1}: {str(e)}")
+                resultados.append(f"[WARNING]  Instrucción {i+1}: {str(e)}")
         
         return {
             "success": True,
