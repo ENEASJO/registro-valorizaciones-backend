@@ -36,3 +36,23 @@ async def listar_ubicaciones(
         for r in rows
     ]
     return {"success": True, "data": data}
+
+@router.get("/agrupadas", summary="Listar ubicaciones agrupadas por tipo")
+async def listar_ubicaciones_agrupadas(
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, Any]:
+    stmt = select(UbicacionDB).where(UbicacionDB.activo == True).order_by(UbicacionDB.nombre.asc())
+    result = await db.execute(stmt)
+    rows: List[UbicacionDB] = result.scalars().all()
+
+    centros = [r.nombre for r in rows if (r.tipo or '').upper() == 'CENTRO_POBLADO']
+    caserios = [r.nombre for r in rows if (r.tipo or '').upper() == 'CASERIO']
+
+    return {
+        "success": True,
+        "data": {
+            "centros_poblados": centros,
+            "caserios": caserios,
+            "total": len(rows)
+        }
+    }
