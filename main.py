@@ -59,6 +59,17 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Cargar router de empresas inteligentes (con fallback manual)
+try:
+    print("📦 Cargando router de empresas inteligentes...")
+    from app.api.routes.empresas_smart import router as empresas_smart_router
+    app.include_router(empresas_smart_router, prefix="/api")
+    print("✅ Router de empresas inteligentes cargado exitosamente")
+except Exception as e:
+    print(f"❌ Error cargando router de empresas inteligentes: {e}")
+    import traceback
+    traceback.print_exc()
+
 # Middleware para manejar headers de proxy (Cloud Run) - DEBE ESTAR ANTES DE CORS
 # Temporalmente desactivado para solucionar error 500
 enable_proxy_middleware = os.environ.get('ENABLE_PROXY_MIDDLEWARE', 'true').lower() == 'true'

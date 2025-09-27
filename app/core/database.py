@@ -120,3 +120,13 @@ async def execute_in_transaction(func, *args, **kwargs):
     """
     async with DatabaseTransaction() as session:
         return await func(session, *args, **kwargs)
+
+# Función para obtener la URL de la base de datos (requerida por algunos servicios)
+def get_database_url() -> str:
+    """
+    Obtener la URL de la base de datos configurada
+    
+    Returns:
+        str: URL de conexión a la base de datos
+    """
+    return DATABASE_URL
