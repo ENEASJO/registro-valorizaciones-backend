@@ -3,9 +3,11 @@ Script de prueba para el sistema de generación automática de códigos de obra
 """
 import asyncio
 import json
+import pytest
 from app.services.obra_service_neon import ObraServiceNeon
 from app.models.obra import ObraCreate
 
+@pytest.mark.asyncio
 async def test_crear_obra_con_codigo_automatico():
     """Probar la creación de obra con código automático"""
     
@@ -118,6 +120,7 @@ async def test_crear_obra_con_codigo_automatico():
         traceback.print_exc()
 
 # Función para probar directamente con SQL
+@pytest.mark.asyncio
 async def test_sql_direct():
     """Prueba directa con SQL para verificar funcionamiento"""
     

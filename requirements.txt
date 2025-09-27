@@ -55,3 +55,7 @@ aiofiles==23.2.1
 # Web scraping and parsing
 beautifulsoup4==4.12.2
 lxml==4.9.3
+
+# Testing dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
