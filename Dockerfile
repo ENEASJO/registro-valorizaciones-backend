@@ -25,8 +25,8 @@ RUN useradd --create-home --shell /bin/bash app && \
     chown -R app:app /app
 
 # Copiar e instalar dependencias completas
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-cloudrun.txt .
+RUN pip install --no-cache-dir -r requirements-cloudrun.txt
 
 # Instalar browsers de Playwright
 RUN python -m playwright install chromium
