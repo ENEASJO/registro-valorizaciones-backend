@@ -131,7 +131,7 @@ class NotificationFilters(BaseModel):
     )
     telefono: Optional[str] = Field(
         None,
-        regex=r'^\+?\d{8,15}$',
+        pattern=r'^\+?\d{8,15}$',
         description="Filtrar por número de teléfono",
         example="+51987654321"
     )
@@ -161,7 +161,7 @@ class TestMessageRequest(BaseModel):
     """Schema para envío de mensaje de prueba"""
     phone_number: str = Field(
         ...,
-        regex=r'^\+?\d{8,15}$',
+        pattern=r'^\+?\d{8,15}$',
         description="Número de teléfono en formato internacional",
         example="+51987654321"
     )

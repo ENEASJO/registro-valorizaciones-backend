@@ -128,7 +128,7 @@ class RepresentanteSchema(BaseModel):
 class EmpresaCreateSchema(BaseModel):
     """Schema para crear una empresa con representantes"""
     # Datos básicos
-    ruc: str = Field(..., description="RUC de 11 dígitos", regex=r'^\d{11}$')
+    ruc: str = Field(..., description="RUC de 11 dígitos", pattern=r'^\d{11}$')
     razon_social: str = Field(..., description="Razón social de la empresa", min_length=2, max_length=255)
     nombre_comercial: Optional[str] = Field(None, description="Nombre comercial de la empresa", max_length=255)
 
@@ -419,7 +419,7 @@ class EmpresaManualCompleta(BaseModel):
     """Modelo completo para empresa con entrada manual y validaciones robustas"""
     
     # Datos básicos (obligatorios)
-    ruc: str = Field(..., regex=r'^\d{11}$', title="RUC de 11 dígitos")
+    ruc: str = Field(..., pattern=r'^\d{11}$', title="RUC de 11 dígitos")
     razon_social: str = Field(..., min_length=3, max_length=255, title="Razón social")
     
     # Datos adicionales básicos

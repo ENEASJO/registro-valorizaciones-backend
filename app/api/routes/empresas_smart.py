@@ -48,7 +48,7 @@ class EmpresaManualCompleta(BaseModel):
     """Modelo completo para empresa ingresada manualmente"""
     
     # Datos básicos (obligatorios)
-    ruc: str = Field(..., regex=r'^\d{11}$', title="RUC de 11 dígitos")
+    ruc: str = Field(..., pattern=r'^\d{11}$', title="RUC de 11 dígitos")
     razon_social: str = Field(..., min_length=2, max_length=255, title="Razón social")
     
     # Datos adicionales básicos
@@ -725,7 +725,7 @@ class EmpresaDualCreate(BaseModel):
     """Modelo para creación dual inteligente de empresas"""
     
     # Datos básicos (siempre requeridos)
-    ruc: str = Field(..., regex=r'^\d{11}$', title="RUC de 11 dígitos")
+    ruc: str = Field(..., pattern=r'^\d{11}$', title="RUC de 11 dígitos")
     
     # Configuración del comportamiento
     intentar_scraping: bool = Field(True, title="¿Intentar scraping automático primero?")
