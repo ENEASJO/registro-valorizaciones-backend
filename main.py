@@ -37,6 +37,17 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Cargar router de SEACE
+try:
+    print("[LOADING] Cargando router de SEACE...")
+    from app.api.routes.seace import router as seace_router
+    app.include_router(seace_router)
+    print("[OK] Router de SEACE cargado exitosamente")
+except Exception as e:
+    print(f"[ERROR] Error cargando router de SEACE: {e}")
+    import traceback
+    traceback.print_exc()
+
 # Cargar router de ubicaciones (San Marcos)
 try:
     print("[LOADING] Cargando router de ubicaciones...")
