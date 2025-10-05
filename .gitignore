@@ -136,6 +136,8 @@ build/
 .env
 .env.local
 .env.*.local
+.env.production
+.env.railway
 
 # IDE
 .vscode/
@@ -149,3 +151,20 @@ Thumbs.db
 
 # Docker
 .dockerignore
+
+# Railway
+.railway/
+
+# Playwright browsers cache
+.cache/
+ms-playwright/
+
+# Database local
+*.db
+valoraciones.db
+
+# Backup files
+*.backup
+*.old
+*.tmp
+backup_*.sql

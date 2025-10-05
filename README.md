@@ -186,10 +186,13 @@ source venv/bin/activate  # Linux/Mac
 # Instalar dependencias
 pip install -r requirements.txt
 
+# Instalar browsers de Playwright (requerido para SUNAT/OSCE)
+python -m playwright install chromium
+
 # Ejecutar servidor de desarrollo (uvicorn)
 uvicorn main:app --reload --port 8000
 
-# O, compatible con Cloud Run (HOST:PORT y logs)
+# O, compatible con Railway/Cloud Run (HOST:PORT y logs)
 uvicorn main:app --host 0.0.0.0 --port 8080 --log-level info
 ```
 
@@ -199,7 +202,7 @@ uvicorn main:app --host 0.0.0.0 --port 8080 --log-level info
 
 ## 🌐 URLs de Producción
 - **Frontend:** https://registro-valorizaciones.vercel.app
-- **Backend:** https://valoraciones-backend-[hash].a.run.app
+- **Backend:** https://xxx.up.railway.app (Railway) o https://valoraciones-backend-[hash].a.run.app (Cloud Run)
 
 ## 📁 Estructura Detallada
 
