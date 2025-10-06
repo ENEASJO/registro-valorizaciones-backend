@@ -115,10 +115,18 @@ class SEACEService:
             ''')
             logger.info("Dropdown de año abierto (JavaScript click)")
 
-            # Esperar a que aparezca el panel del dropdown y hacer clic en la opción
+            # Esperar a que aparezca el panel del dropdown y hacer clic en la opción usando JavaScript
             await page.wait_for_timeout(500)  # Esperar animación
-            await page.click(f'#{year_dropdown_id}_panel li:has-text("{anio}")')
-            logger.info(f"Año seleccionado: {anio}")
+            await page.evaluate(f'''
+                const panel = document.querySelector("#{year_dropdown_id_escaped}_panel");
+                if (panel) {{
+                    const option = Array.from(panel.querySelectorAll("li")).find(li => li.textContent.trim() === "{anio}");
+                    if (option) {{
+                        option.click();
+                    }}
+                }}
+            ''')
+            logger.info(f"Año seleccionado: {anio} (JavaScript click)")
 
             # Ingresar el CUI usando el ID exacto del campo
             cui_input_id = 'tbBuscador\\:idFormBuscarProceso\\:CUI'
