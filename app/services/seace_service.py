@@ -109,8 +109,8 @@ class SEACEService:
             )
             logger.info("Dropdown de año encontrado")
 
-            # Hacer clic en el dropdown para abrirlo
-            await page.click(f'#{year_dropdown_id}')
+            # Hacer clic en el dropdown para abrirlo (force=True para bypass visibility check)
+            await page.click(f'#{year_dropdown_id}', force=True)
             logger.info("Dropdown de año abierto")
 
             # Esperar a que aparezca el panel del dropdown y hacer clic en la opción
