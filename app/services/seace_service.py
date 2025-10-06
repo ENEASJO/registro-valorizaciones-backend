@@ -168,21 +168,28 @@ class SEACEService:
             raise ExtractionException(f"Error ejecutando búsqueda: {str(e)}")
 
     async def _navegar_a_historial(self, page: Page):
-        """Navega al historial de contratación (tercer ícono en Acciones)"""
+        """Navega al historial de contratación (primer ícono en Acciones)"""
         logger.info("Navegando a historial de contratación")
 
         try:
-            # Buscar el tercer ícono en la columna de Acciones
-            historial_icon = await page.wait_for_selector(
-                'td.ui-dt-c:has(span.ui-outputlabel:text-is("Acciones")) ~ td a.ui-commandlink:nth-child(3)',
+            # Buscar la tabla de resultados
+            tabla_resultados = await page.wait_for_selector(
+                '#tbBuscador\\:idFormBuscarProceso\\:pnlGrdResultadosProcesos table tbody tr:last-child',
                 timeout=30000,
                 state='visible'
             )
+
+            # Buscar el primer ícono (historial) en la columna de Acciones
+            historial_icon = await tabla_resultados.query_selector('td:last-child a.ui-commandlink:first-child')
+
+            if not historial_icon:
+                raise ExtractionException("No se encontró el ícono de historial")
+
             await historial_icon.click()
             logger.info("Clic en ícono de historial")
 
-            # Esperar a que cargue el historial
-            await page.wait_for_selector('table.ui-datatable-data', timeout=30000, state='visible')
+            # Esperar a que cargue el historial - buscar por texto "Visualizar historial"
+            await page.wait_for_selector('text=Visualizar historial de contratación', timeout=30000, state='visible')
             logger.info("Historial cargado")
 
         except Exception as e:
@@ -194,17 +201,18 @@ class SEACEService:
         logger.info("Navegando a ficha de selección")
 
         try:
-            # Buscar el segundo ícono en la tabla de historial
+            # Buscar todas las tablas y encontrar la que tiene la columna "Acciones"
+            # En la página de historial, buscar el segundo ícono (ficha) en la primera fila
             ficha_icon = await page.wait_for_selector(
-                'table.ui-datatable-data tr:first-child td a.ui-commandlink:nth-child(2)',
+                'table tbody tr:first-child td:last-child a.ui-commandlink:nth-child(2)',
                 timeout=30000,
                 state='visible'
             )
             await ficha_icon.click()
             logger.info("Clic en ícono de ficha")
 
-            # Esperar a que cargue la ficha
-            await page.wait_for_selector('span.ui-outputlabel:text-is("Nomenclatura")', timeout=30000, state='visible')
+            # Esperar a que cargue la ficha - buscar el tab "Ficha de Seleccion"
+            await page.wait_for_selector('text=Ficha de Seleccion', timeout=30000, state='visible')
             logger.info("Ficha cargada")
 
         except Exception as e:
