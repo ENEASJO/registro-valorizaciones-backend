@@ -141,39 +141,47 @@ class SEACEService:
             logger.info(f"CUI ingresado: {cui} (JavaScript)")
             
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
-            await page.wait_for_timeout(1000)  # Esperar estabilización del formulario
-            await page.evaluate('''
-                const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
-                if (buscarButton) {
-                    buscarButton.click();
-                }
+            await page.wait_for_timeout(2000)  # Esperar estabilización del formulario (aumentado)
+            button_clicked = await page.evaluate('''
+                (() => {
+                    const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
+                    if (buscarButton) {
+                        buscarButton.click();
+                        return true;
+                    }
+                    return false;
+                })()
             ''')
-            logger.info("Clic en botón Buscar (JavaScript)")
+            if button_clicked:
+                logger.info("Clic en botón Buscar exitoso (JavaScript)")
+                await page.wait_for_timeout(3000)  # Esperar procesamiento inicial de SEACE
+            else:
+                raise ExtractionException("No se pudo hacer clic en el botón Buscar")
 
-            # Esperar a que aparezca el paginador (sin validar visibilidad estricta)
-            logger.info("Esperando que aparezca el paginador de resultados")
-            await page.wait_for_function(
-                '''
-                document.querySelector("#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current") !== null
-                ''',
-                timeout=45000
-            )
-            logger.info("Paginador encontrado")
-
-            # Esperar tiempo adicional para que SEACE termine de procesar la búsqueda
-            # SEACE puede mostrar "0 a 0" inicialmente y luego actualizar a los resultados reales
-            await page.wait_for_timeout(5000)
-            logger.info("Esperando finalización de procesamiento SEACE (5 segundos)")
-
-            # Verificar que haya resultados (no "0 a 0 del total 0")
-            paginator_selector_escaped = '#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current'
-            paginator = await page.query_selector(paginator_selector_escaped)
-            if paginator:
-                paginator_text = await paginator.inner_text()
-                logger.info(f"Paginador: {paginator_text}")
-                if 'total 0' in paginator_text.lower() or '0 a 0' in paginator_text.lower():
-                    logger.error(f"No se encontraron resultados para CUI {cui}, año {anio}")
+            # Esperar a que aparezca el paginador y que muestre resultados (no "0 a 0")
+            logger.info("Esperando que aparezca el paginador de resultados con datos")
+            try:
+                await page.wait_for_function(
+                    '''
+                    const paginator = document.querySelector("#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current");
+                    if (!paginator) return false;
+                    const text = paginator.textContent.toLowerCase();
+                    return !text.includes('total 0') && !text.includes('0 a 0');
+                    ''',
+                    timeout=30000
+                )
+                logger.info("Paginador con resultados encontrado")
+            except PlaywrightTimeoutError:
+                # Si timeout, verificar el texto del paginador para dar mensaje específico
+                paginator_selector_css = '#tbBuscador\\:idFormBuscarProceso\\:pnlGrdResultadosProcesos .ui-paginator-current'
+                paginator = await page.query_selector(paginator_selector_css)
+                if paginator:
+                    paginator_text = await paginator.inner_text()
+                    logger.error(f"Timeout esperando resultados. Paginador: {paginator_text}")
                     raise ExtractionException(f"No se encontraron resultados en SEACE para CUI {cui} en el año {anio}. Verifica que el CUI y el año sean correctos.")
+                else:
+                    logger.error("Timeout: paginador no encontrado")
+                    raise ExtractionException("Timeout esperando paginador de resultados")
 
             # Confirmar que la columna "Acciones" existe (sin validar visibilidad)
             await page.wait_for_function(
