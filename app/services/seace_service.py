@@ -127,8 +127,15 @@ class SEACEService:
                 raise ExtractionException("No se pudo encontrar el campo de CUI")
             
             # Hacer clic en el botón "Buscar"
+            # Esperar a que el botón esté visible y habilitado
+            await page.wait_for_selector('button:has-text("Buscar")', timeout=10000, state='visible')
             buscar_button = await page.query_selector('button:has-text("Buscar")')
             if buscar_button:
+                # Scroll the button into view
+                await buscar_button.scroll_into_view_if_needed()
+                # Wait a bit for any JavaScript to settle
+                await page.wait_for_timeout(1000)
+                # Click the button
                 await buscar_button.click()
                 logger.info("Clic en botón Buscar")
             else:
