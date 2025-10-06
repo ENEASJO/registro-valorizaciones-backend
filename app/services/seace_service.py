@@ -64,13 +64,13 @@ class SEACEService:
                 # Navegar a SEACE
                 logger.info("Navegando a página principal de SEACE")
                 await page.goto(self.base_url, timeout=self.timeout, wait_until='domcontentloaded')
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(10000)  # Esperar 10 segundos para que la página cargue completamente
 
                 # Hacer clic en la pestaña "Buscador de Procedimientos de Selección"
                 logger.info("Haciendo clic en pestaña de búsqueda de procedimientos")
                 try:
                     await page.click('a:has-text("Buscador de Procedimientos de Selección")', timeout=10000)
-                    await page.wait_for_timeout(2000)
+                    await page.wait_for_timeout(5000)  # Esperar 5 segundos después del clic
                 except Exception as e:
                     logger.warning(f"No se pudo hacer clic en la pestaña, asumiendo que ya está en la página correcta: {e}")
 
