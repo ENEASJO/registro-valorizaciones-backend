@@ -72,11 +72,25 @@ class SEACEService:
     async def _navegar_a_seace(self, page: Page):
         """Navega a la página principal de SEACE"""
         logger.info(f"Navegando a SEACE: {self.BASE_URL}")
-        await page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=60000)
-        
-        # Esperar a que cargue el formulario de búsqueda
-        await page.wait_for_selector('input[type="text"]', timeout=30000, state='visible')
-        logger.info("Página SEACE cargada correctamente")
+        await page.goto(self.BASE_URL, wait_until='networkidle', timeout=60000)
+
+        # Esperar a que el tab activo cargue completamente
+        await page.wait_for_selector('.ui-tabs-selected.ui-state-active', timeout=30000, state='visible')
+        logger.info("Tab de búsqueda activo")
+
+        # Esperar tiempo adicional para que JavaScript inicialice el formulario
+        # En headless puede tomar más tiempo que en modo gráfico
+        await page.wait_for_timeout(8000)
+        logger.info("Esperando inicialización del formulario (8 segundos)")
+
+        # Verificar que el campo CUI exista (sin validar visibilidad estricta)
+        # Los dos puntos en IDs JSF deben escaparse en querySelector
+        cui_input_id = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
+        await page.wait_for_function(
+            f'document.querySelector("#{cui_input_id}") !== null',
+            timeout=30000
+        )
+        logger.info("Campo CUI encontrado - Página SEACE cargada correctamente")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
         """Ejecuta la búsqueda por CUI y año en SEACE"""
@@ -85,38 +99,65 @@ class SEACEService:
         try:
             # Seleccionar el año - PrimeFaces dropdown (click to open, then select)
             year_dropdown_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
-            await page.click(f'#{year_dropdown_id}')
-            logger.info("Dropdown de año abierto")
 
-            # Esperar a que aparezca el panel del dropdown y hacer clic en la opción
+            # Verificar que el dropdown exista (sin validar visibilidad estricta)
+            # Los dos puntos en IDs JSF deben escaparse en querySelector
+            year_dropdown_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:anioConvocatoria'
+            await page.wait_for_function(
+                f'document.querySelector("#{year_dropdown_id_escaped}") !== null',
+                timeout=30000
+            )
+            logger.info("Dropdown de año encontrado")
+
+            # Hacer clic en el dropdown usando JavaScript (bypass Playwright visibility check)
+            await page.evaluate(f'''
+                document.querySelector("#{year_dropdown_id_escaped}").click();
+            ''')
+            logger.info("Dropdown de año abierto (JavaScript click)")
+
+            # Esperar a que aparezca el panel del dropdown y hacer clic en la opción usando JavaScript
             await page.wait_for_timeout(500)  # Esperar animación
-            await page.click(f'#{year_dropdown_id}_panel li:has-text("{anio}")')
-            logger.info(f"Año seleccionado: {anio}")
+            await page.evaluate(f'''
+                const panel = document.querySelector("#{year_dropdown_id_escaped}_panel");
+                if (panel) {{
+                    const option = Array.from(panel.querySelectorAll("li")).find(li => li.textContent.trim() === "{anio}");
+                    if (option) {{
+                        option.click();
+                    }}
+                }}
+            ''')
+            logger.info(f"Año seleccionado: {anio} (JavaScript click)")
 
-            # Ingresar el CUI usando el ID exacto del campo
-            cui_input_id = 'tbBuscador\\:idFormBuscarProceso\\:CUI'
-            await page.fill(f'#{cui_input_id}', cui)
-            logger.info(f"CUI ingresado: {cui}")
+            # Ingresar el CUI usando JavaScript (bypass visibility check)
+            cui_input_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
+            await page.evaluate(f'''
+                const cuiInput = document.querySelector("#{cui_input_id_escaped}");
+                if (cuiInput) {{
+                    cuiInput.value = "{cui}";
+                    cuiInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    cuiInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+            ''')
+            logger.info(f"CUI ingresado: {cui} (JavaScript)")
             
-            # Hacer clic en el botón "Buscar"
-            # Esperar a que el botón esté visible y habilitado
-            await page.wait_for_selector('button:has-text("Buscar")', timeout=10000, state='visible')
-            buscar_button = await page.query_selector('button:has-text("Buscar")')
-            if buscar_button:
-                # Scroll the button into view
-                await buscar_button.scroll_into_view_if_needed()
-                # Wait a bit for any JavaScript to settle
-                await page.wait_for_timeout(1000)
-                # Click the button
-                await buscar_button.click()
-                logger.info("Clic en botón Buscar")
-            else:
-                raise ExtractionException("No se encontró el botón Buscar")
-            
-            # Esperar a que aparezca el paginador específico de la tabla de resultados de búsqueda
+            # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
+            await page.wait_for_timeout(1000)  # Esperar estabilización del formulario
+            await page.evaluate('''
+                const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
+                if (buscarButton) {
+                    buscarButton.click();
+                }
+            ''')
+            logger.info("Clic en botón Buscar (JavaScript)")
+
+            # Esperar a que aparezca el paginador (sin validar visibilidad estricta)
             logger.info("Esperando que aparezca el paginador de resultados")
-            paginator_selector = '#tbBuscador\\:idFormBuscarProceso\\:pnlGrdResultadosProcesos .ui-paginator-current'
-            await page.wait_for_selector(paginator_selector, timeout=45000, state='visible')
+            await page.wait_for_function(
+                '''
+                document.querySelector("#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current") !== null
+                ''',
+                timeout=45000
+            )
             logger.info("Paginador encontrado")
 
             # Esperar tiempo adicional para que SEACE termine de procesar la búsqueda
@@ -125,7 +166,8 @@ class SEACEService:
             logger.info("Esperando finalización de procesamiento SEACE (5 segundos)")
 
             # Verificar que haya resultados (no "0 a 0 del total 0")
-            paginator = await page.query_selector(paginator_selector)
+            paginator_selector_escaped = '#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current'
+            paginator = await page.query_selector(paginator_selector_escaped)
             if paginator:
                 paginator_text = await paginator.inner_text()
                 logger.info(f"Paginador: {paginator_text}")
@@ -133,8 +175,11 @@ class SEACEService:
                     logger.error(f"No se encontraron resultados para CUI {cui}, año {anio}")
                     raise ExtractionException(f"No se encontraron resultados en SEACE para CUI {cui} en el año {anio}. Verifica que el CUI y el año sean correctos.")
 
-            # Confirmar que la columna "Acciones" está visible
-            await page.wait_for_selector('text=Acciones', timeout=10000, state='visible')
+            # Confirmar que la columna "Acciones" existe (sin validar visibilidad)
+            await page.wait_for_function(
+                'document.evaluate("//text()[contains(., \'Acciones\')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue !== null',
+                timeout=10000
+            )
             logger.info("Resultados de búsqueda cargados completamente")
 
         except Exception as e:
