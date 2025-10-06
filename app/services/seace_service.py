@@ -166,8 +166,9 @@ class SEACEService:
             logger.info("Esperando finalización de procesamiento SEACE (5 segundos)")
 
             # Verificar que haya resultados (no "0 a 0 del total 0")
-            paginator_selector_escaped = '#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current'
-            paginator = await page.query_selector(paginator_selector_escaped)
+            # Para query_selector CSS, usar escape simple (2 barras en Python string)
+            paginator_selector_css = '#tbBuscador\\:idFormBuscarProceso\\:pnlGrdResultadosProcesos .ui-paginator-current'
+            paginator = await page.query_selector(paginator_selector_css)
             if paginator:
                 paginator_text = await paginator.inner_text()
                 logger.info(f"Paginador: {paginator_text}")
