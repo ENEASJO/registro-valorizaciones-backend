@@ -77,7 +77,7 @@ class SEACEService:
 
                 # Esperar a que aparezca el formulario de búsqueda como indicador de carga completa
                 logger.info("Esperando que el formulario de búsqueda esté disponible")
-                await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:codigoCUI', timeout=90000, state='visible')
+                await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:CUI', timeout=90000, state='visible')
                 logger.info("Formulario de búsqueda disponible")
 
                 # Realizar búsqueda
@@ -131,7 +131,7 @@ class SEACEService:
 
         try:
             # Llenar el campo CUI (ya deberíamos tenerlo disponible desde la carga inicial)
-            cui_input = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:codigoCUI', timeout=90000, state='visible')
+            cui_input = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:CUI', timeout=90000, state='visible')
             await cui_input.fill(cui)
             logger.info(f"CUI {cui} ingresado")
             await page.wait_for_timeout(500)
