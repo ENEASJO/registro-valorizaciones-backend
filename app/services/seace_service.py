@@ -93,41 +93,11 @@ class SEACEService:
         logger.info("Campo CUI encontrado - Página SEACE cargada correctamente")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
-        """Ejecuta la búsqueda por CUI y año en SEACE con Version SEACE = Seace 3"""
-        logger.info(f"Ejecutando búsqueda: Año={anio}, CUI={cui}, Version SEACE=Seace 3")
+        """Ejecuta la búsqueda por CUI y año en SEACE (Version SEACE ya viene en 'Seace 3' por defecto)"""
+        logger.info(f"Ejecutando búsqueda: Año={anio}, CUI={cui} (Version SEACE ya viene en 'Seace 3' por defecto)")
 
         try:
-            # PASO 1: Seleccionar "Seace 3" en el dropdown "Version SEACE"
-            version_dropdown_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:versionSeace'
-            await page.wait_for_function(
-                f'document.querySelector("#{version_dropdown_id_escaped}") !== null',
-                timeout=30000
-            )
-            logger.info("Dropdown de Version SEACE encontrado")
-
-            # Abrir dropdown de Version SEACE
-            await page.evaluate(f'''
-                document.querySelector("#{version_dropdown_id_escaped}").click();
-            ''')
-            logger.info("Dropdown de Version SEACE abierto")
-
-            await page.wait_for_timeout(500)  # Esperar animación
-
-            # Seleccionar "Seace 3"
-            await page.evaluate(f'''
-                const panel = document.querySelector("#{version_dropdown_id_escaped}_panel");
-                if (panel) {{
-                    const option = Array.from(panel.querySelectorAll("li")).find(li => li.textContent.trim() === "Seace 3");
-                    if (option) {{
-                        option.click();
-                    }}
-                }}
-            ''')
-            logger.info("Version SEACE 'Seace 3' seleccionado")
-
-            await page.wait_for_timeout(500)
-
-            # PASO 2: Seleccionar el año
+            # PASO 1: Seleccionar el año
             year_dropdown_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:anioConvocatoria'
             await page.wait_for_function(
                 f'document.querySelector("#{year_dropdown_id_escaped}") !== null',
@@ -157,7 +127,7 @@ class SEACEService:
 
             await page.wait_for_timeout(500)
 
-            # PASO 3: Ingresar el CUI
+            # PASO 2: Ingresar el CUI
             cui_input_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
             await page.evaluate(f'''
                 const cuiInput = document.querySelector("#{cui_input_id_escaped}");
