@@ -100,8 +100,16 @@ class SEACEService:
             # Seleccionar el año - PrimeFaces dropdown (click to open, then select)
             year_dropdown_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
 
-            # Wait for dropdown to be visible before clicking
-            await page.wait_for_selector(f'#{year_dropdown_id}', timeout=30000, state='visible')
+            # Verificar que el dropdown exista (sin validar visibilidad estricta)
+            # Los dos puntos en IDs JSF deben escaparse en querySelector
+            year_dropdown_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:anioConvocatoria'
+            await page.wait_for_function(
+                f'document.querySelector("#{year_dropdown_id_escaped}") !== null',
+                timeout=30000
+            )
+            logger.info("Dropdown de año encontrado")
+
+            # Hacer clic en el dropdown para abrirlo
             await page.click(f'#{year_dropdown_id}')
             logger.info("Dropdown de año abierto")
 
