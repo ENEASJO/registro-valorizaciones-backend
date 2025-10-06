@@ -166,6 +166,15 @@ class SEACEService:
             await page.wait_for_selector('text=Mostrando de', timeout=45000, state='visible')
             logger.info("Tabla de resultados encontrada")
 
+            # Verificar que haya resultados (no "0 a 0 del total 0")
+            paginator = await page.query_selector('.ui-paginator-current')
+            if paginator:
+                paginator_text = await paginator.inner_text()
+                logger.info(f"Paginador: {paginator_text}")
+                if 'total 0' in paginator_text.lower() or '0 a 0' in paginator_text.lower():
+                    logger.error(f"No se encontraron resultados para CUI {cui}, año {anio}")
+                    raise ExtractionException(f"No se encontraron resultados en SEACE para CUI {cui} en el año {anio}. Verifica que el CUI y el año sean correctos.")
+
             # Confirmar que la columna "Acciones" está visible
             await page.wait_for_selector('span.ui-outputlabel:text-is("Acciones")', timeout=10000, state='visible')
             logger.info("Resultados de búsqueda cargados completamente")
