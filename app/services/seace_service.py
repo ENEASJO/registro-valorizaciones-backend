@@ -141,6 +141,9 @@ class SEACEService:
             """)
             logger.info(f"Año {anio} seleccionado")
 
+            # Esperar un momento para que el cambio se procese
+            await page.wait_for_timeout(500)
+
             # Hacer clic en el botón Buscar
             buscar_button = await page.query_selector('#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSelToken')
             await buscar_button.click()
