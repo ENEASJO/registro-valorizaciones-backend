@@ -72,11 +72,18 @@ class SEACEService:
     async def _navegar_a_seace(self, page: Page):
         """Navega a la página principal de SEACE"""
         logger.info(f"Navegando a SEACE: {self.BASE_URL}")
-        await page.goto(self.BASE_URL, wait_until='domcontentloaded', timeout=60000)
+        await page.goto(self.BASE_URL, wait_until='networkidle', timeout=60000)
 
-        # Esperar a que cargue el formulario de búsqueda específico (campo CUI)
+        # Esperar a que el tab activo cargue completamente
+        await page.wait_for_selector('.ui-tabs-selected.ui-state-active', timeout=30000, state='visible')
+        logger.info("Tab de búsqueda activo")
+
+        # Esperar tiempo adicional para que JavaScript inicialice el formulario
+        await page.wait_for_timeout(3000)
+
+        # Ahora esperar a que el campo CUI sea visible
         cui_input_id = 'tbBuscador\\:idFormBuscarProceso\\:CUI'
-        await page.wait_for_selector(f'#{cui_input_id}', timeout=60000, state='visible')
+        await page.wait_for_selector(f'#{cui_input_id}', timeout=30000, state='visible')
         logger.info("Página SEACE cargada correctamente")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
