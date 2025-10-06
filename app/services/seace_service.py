@@ -93,8 +93,8 @@ class SEACEService:
         logger.info("Campo CUI encontrado - Página SEACE cargada correctamente")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
-        """Ejecuta la búsqueda por año en SEACE (el CUI se busca en los resultados)"""
-        logger.info(f"Ejecutando búsqueda: Año={anio} (el CUI {cui} se buscará en los resultados)")
+        """Ejecuta la búsqueda por año y CUI en descripción en SEACE"""
+        logger.info(f"Ejecutando búsqueda: Año={anio}, CUI={cui} (en descripción)")
 
         try:
             # Seleccionar el año - PrimeFaces dropdown (click to open, then select)
@@ -128,9 +128,19 @@ class SEACEService:
             ''')
             logger.info(f"Año seleccionado: {anio} (JavaScript click)")
 
-            # NO ingresar el CUI - buscar solo por año
-            # El campo CUI en SEACE no funciona correctamente para búsquedas
-            logger.info("Búsqueda solo por año (sin CUI)")
+            # Ingresar el CUI en el campo "Descripción del Objeto" para filtrar resultados
+            # El campo "Código Único de Inversión" no funciona correctamente
+            # Usar descripción con "CUI {numero}" es más confiable
+            descripcion_input_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:descripcionObjeto'
+            await page.evaluate(f'''
+                const descripcionInput = document.querySelector("#{descripcion_input_id_escaped}");
+                if (descripcionInput) {{
+                    descripcionInput.value = "CUI {cui}";
+                    descripcionInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    descripcionInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+            ''')
+            logger.info(f"CUI {cui} ingresado en campo Descripción del Objeto")
 
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
             await page.wait_for_timeout(2000)  # Esperar estabilización del formulario
