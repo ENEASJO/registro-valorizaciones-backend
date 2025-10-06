@@ -79,7 +79,9 @@ class SEACEService:
         logger.info("Tab de búsqueda activo")
 
         # Esperar tiempo adicional para que JavaScript inicialice el formulario
-        await page.wait_for_timeout(3000)
+        # En headless puede tomar más tiempo que en modo gráfico
+        await page.wait_for_timeout(8000)
+        logger.info("Esperando inicialización del formulario (8 segundos)")
 
         # Ahora esperar a que el campo CUI sea visible
         cui_input_id = 'tbBuscador\\:idFormBuscarProceso\\:CUI'
