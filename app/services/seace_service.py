@@ -152,10 +152,26 @@ class SEACEService:
             await buscar_button.click()
             logger.info("Botón Buscar clickeado")
 
-            # Esperar a que aparezcan los resultados - buscar la columna "Acciones" que indica que la tabla cargó
+            # Esperar a que termine la actividad de red después del clic
+            logger.info("Esperando que termine la actividad de red")
+            await page.wait_for_load_state('networkidle', timeout=120000)
+            logger.info("Actividad de red completada")
+
+            # Dar un pequeño tiempo adicional para que el DOM se actualice
+            await page.wait_for_timeout(2000)
+
+            # Esperar a que aparezcan los resultados - buscar la tabla de resultados primero
             logger.info("Esperando que aparezcan los resultados de búsqueda")
-            await page.wait_for_selector('span.ui-outputlabel:text-is("Acciones")', timeout=90000, state='visible')
-            logger.info("Resultados de búsqueda cargados")
+            try:
+                # Intentar primero esperar por la tabla de datos
+                await page.wait_for_selector('table.ui-datatable-data', timeout=30000, state='visible')
+                logger.info("Tabla de resultados encontrada")
+            except Exception as e:
+                logger.warning(f"No se encontró la tabla de datos directamente: {str(e)}")
+
+            # Luego esperar por la columna "Acciones" como confirmación final
+            await page.wait_for_selector('span.ui-outputlabel:text-is("Acciones")', timeout=30000, state='visible')
+            logger.info("Resultados de búsqueda cargados completamente")
 
         except Exception as e:
             logger.error(f"Error ejecutando búsqueda: {str(e)}")
