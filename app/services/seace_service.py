@@ -154,9 +154,9 @@ class SEACEService:
             except Exception as e:
                 logger.warning(f"Timeout esperando networkidle: {str(e)}, continuando...")
 
-            # Esperar a que aparezcan los resultados - buscar la tabla de resultados primero
+            # Esperar a que aparezcan los resultados - esperar por texto "Mostrando de"
             logger.info("Esperando que aparezcan los resultados de búsqueda")
-            await page.wait_for_selector('table.ui-datatable-data', timeout=45000, state='visible')
+            await page.wait_for_selector('text=Mostrando de', timeout=45000, state='visible')
             logger.info("Tabla de resultados encontrada")
 
             # Confirmar que la columna "Acciones" está visible
