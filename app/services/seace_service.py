@@ -140,7 +140,7 @@ class SEACEService:
             logger.info(f"CUI ingresado: {cui}")
 
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
-            await page.wait_for_timeout(2000)  # Esperar estabilización del formulario
+            await page.wait_for_timeout(3000)  # Esperar estabilización del formulario (aumentado de 2s a 3s)
             button_clicked = await page.evaluate('''
                 (() => {
                     const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
@@ -153,7 +153,7 @@ class SEACEService:
             ''')
             if button_clicked:
                 logger.info("Clic en botón Buscar exitoso (JavaScript)")
-                await page.wait_for_timeout(3000)  # Esperar procesamiento inicial de SEACE
+                await page.wait_for_timeout(8000)  # Esperar procesamiento inicial de SEACE (aumentado de 3s a 8s para headless)
             else:
                 raise ExtractionException("No se pudo hacer clic en el botón Buscar")
 
