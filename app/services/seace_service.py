@@ -84,7 +84,8 @@ class SEACEService:
         logger.info("Esperando inicialización del formulario (8 segundos)")
 
         # Verificar que el campo CUI sea visible usando JavaScript (offsetParent check)
-        cui_input_id = 'tbBuscador:idFormBuscarProceso:CUI'
+        # Los dos puntos en IDs JSF deben escaparse en querySelector
+        cui_input_id = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
         await page.wait_for_function(
             f'document.querySelector("#{cui_input_id}") && document.querySelector("#{cui_input_id}").offsetParent !== null',
             timeout=30000
