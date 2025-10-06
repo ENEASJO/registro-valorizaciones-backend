@@ -70,18 +70,15 @@ class SEACEService:
                 await page.wait_for_load_state('domcontentloaded')
                 await page.wait_for_load_state('load')
 
+                # Hacer clic en la pestaña "Buscador de Procedimientos de Selección"
+                logger.info("Haciendo clic en pestaña de búsqueda de procedimientos")
+                await page.click('a:has-text("Buscador de Procedimientos de Selección")', timeout=30000)
+                logger.info("Pestaña clickeada, esperando carga del formulario")
+
                 # Esperar a que aparezca el formulario de búsqueda como indicador de carga completa
                 logger.info("Esperando que el formulario de búsqueda esté disponible")
                 await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:codigoCUI', timeout=90000, state='visible')
                 logger.info("Formulario de búsqueda disponible")
-
-                # Hacer clic en la pestaña "Buscador de Procedimientos de Selección"
-                logger.info("Haciendo clic en pestaña de búsqueda de procedimientos")
-                try:
-                    await page.click('a:has-text("Buscador de Procedimientos de Selección")', timeout=10000)
-                    await page.wait_for_timeout(2000)
-                except Exception as e:
-                    logger.warning(f"No se pudo hacer clic en la pestaña, asumiendo que ya está en la página correcta: {e}")
 
                 # Realizar búsqueda
                 await self._ejecutar_busqueda(page, cui, anio)
