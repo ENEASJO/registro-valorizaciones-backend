@@ -83,9 +83,14 @@ class SEACEService:
         logger.info(f"Ejecutando búsqueda: CUI={cui}, Año={anio}")
 
         try:
-            # Seleccionar el año - es un SELECT dropdown de PrimeFaces
-            year_select_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria_input'
-            await page.select_option(f'#{year_select_id}', str(anio))
+            # Seleccionar el año - PrimeFaces dropdown (click to open, then select)
+            year_dropdown_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
+            await page.click(f'#{year_dropdown_id}')
+            logger.info("Dropdown de año abierto")
+
+            # Esperar a que aparezca el panel del dropdown y hacer clic en la opción
+            await page.wait_for_timeout(500)  # Esperar animación
+            await page.click(f'#{year_dropdown_id}_panel li:has-text("{anio}")')
             logger.info(f"Año seleccionado: {anio}")
 
             # Ingresar el CUI usando el ID exacto del campo
