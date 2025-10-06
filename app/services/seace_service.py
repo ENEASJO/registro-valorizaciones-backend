@@ -140,25 +140,24 @@ class SEACEService:
             ''')
             logger.info(f"CUI ingresado: {cui} (JavaScript)")
             
-            # Hacer clic en el botón "Buscar"
-            # Esperar a que el botón esté visible y habilitado
-            await page.wait_for_selector('button:has-text("Buscar")', timeout=10000, state='visible')
-            buscar_button = await page.query_selector('button:has-text("Buscar")')
-            if buscar_button:
-                # Scroll the button into view
-                await buscar_button.scroll_into_view_if_needed()
-                # Wait a bit for any JavaScript to settle
-                await page.wait_for_timeout(1000)
-                # Click the button
-                await buscar_button.click()
-                logger.info("Clic en botón Buscar")
-            else:
-                raise ExtractionException("No se encontró el botón Buscar")
-            
-            # Esperar a que aparezca el paginador específico de la tabla de resultados de búsqueda
+            # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
+            await page.wait_for_timeout(1000)  # Esperar estabilización del formulario
+            await page.evaluate('''
+                const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
+                if (buscarButton) {
+                    buscarButton.click();
+                }
+            ''')
+            logger.info("Clic en botón Buscar (JavaScript)")
+
+            # Esperar a que aparezca el paginador (sin validar visibilidad estricta)
             logger.info("Esperando que aparezca el paginador de resultados")
-            paginator_selector = '#tbBuscador\\:idFormBuscarProceso\\:pnlGrdResultadosProcesos .ui-paginator-current'
-            await page.wait_for_selector(paginator_selector, timeout=45000, state='visible')
+            await page.wait_for_function(
+                '''
+                document.querySelector("#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current") !== null
+                ''',
+                timeout=45000
+            )
             logger.info("Paginador encontrado")
 
             # Esperar tiempo adicional para que SEACE termine de procesar la búsqueda
@@ -167,7 +166,8 @@ class SEACEService:
             logger.info("Esperando finalización de procesamiento SEACE (5 segundos)")
 
             # Verificar que haya resultados (no "0 a 0 del total 0")
-            paginator = await page.query_selector(paginator_selector)
+            paginator_selector_escaped = '#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current'
+            paginator = await page.query_selector(paginator_selector_escaped)
             if paginator:
                 paginator_text = await paginator.inner_text()
                 logger.info(f"Paginador: {paginator_text}")
@@ -175,8 +175,11 @@ class SEACEService:
                     logger.error(f"No se encontraron resultados para CUI {cui}, año {anio}")
                     raise ExtractionException(f"No se encontraron resultados en SEACE para CUI {cui} en el año {anio}. Verifica que el CUI y el año sean correctos.")
 
-            # Confirmar que la columna "Acciones" está visible
-            await page.wait_for_selector('text=Acciones', timeout=10000, state='visible')
+            # Confirmar que la columna "Acciones" existe (sin validar visibilidad)
+            await page.wait_for_function(
+                'document.evaluate("//text()[contains(., \'Acciones\')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue !== null',
+                timeout=10000
+            )
             logger.info("Resultados de búsqueda cargados completamente")
 
         except Exception as e:
