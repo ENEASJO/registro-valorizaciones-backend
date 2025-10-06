@@ -3,7 +3,7 @@
 
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile.railway"
+dockerfilePath = "Dockerfile_playwright"
 
 [deploy]
 # No especificar startCommand - Railway usará el CMD del Dockerfile
