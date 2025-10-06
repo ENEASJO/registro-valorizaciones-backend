@@ -143,12 +143,14 @@ class SEACEService:
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
             await page.wait_for_timeout(2000)  # Esperar estabilización del formulario (aumentado)
             button_clicked = await page.evaluate('''
-                const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
-                if (buscarButton) {
-                    buscarButton.click();
-                    return true;
-                }
-                return false;
+                (() => {
+                    const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
+                    if (buscarButton) {
+                        buscarButton.click();
+                        return true;
+                    }
+                    return false;
+                })()
             ''')
             if button_clicked:
                 logger.info("Clic en botón Buscar exitoso (JavaScript)")
