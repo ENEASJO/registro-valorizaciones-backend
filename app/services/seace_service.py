@@ -93,15 +93,41 @@ class SEACEService:
         logger.info("Campo CUI encontrado - Página SEACE cargada correctamente")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
-        """Ejecuta la búsqueda por año en SEACE (el CUI se busca en los resultados)"""
-        logger.info(f"Ejecutando búsqueda: Año={anio} (el CUI {cui} se buscará en los resultados)")
+        """Ejecuta la búsqueda por CUI y año en SEACE con Version SEACE = Seace 3"""
+        logger.info(f"Ejecutando búsqueda: Año={anio}, CUI={cui}, Version SEACE=Seace 3")
 
         try:
-            # Seleccionar el año - PrimeFaces dropdown (click to open, then select)
-            year_dropdown_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
+            # PASO 1: Seleccionar "Seace 3" en el dropdown "Version SEACE"
+            version_dropdown_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:versionSeace'
+            await page.wait_for_function(
+                f'document.querySelector("#{version_dropdown_id_escaped}") !== null',
+                timeout=30000
+            )
+            logger.info("Dropdown de Version SEACE encontrado")
 
-            # Verificar que el dropdown exista (sin validar visibilidad estricta)
-            # Los dos puntos en IDs JSF deben escaparse en querySelector
+            # Abrir dropdown de Version SEACE
+            await page.evaluate(f'''
+                document.querySelector("#{version_dropdown_id_escaped}").click();
+            ''')
+            logger.info("Dropdown de Version SEACE abierto")
+
+            await page.wait_for_timeout(500)  # Esperar animación
+
+            # Seleccionar "Seace 3"
+            await page.evaluate(f'''
+                const panel = document.querySelector("#{version_dropdown_id_escaped}_panel");
+                if (panel) {{
+                    const option = Array.from(panel.querySelectorAll("li")).find(li => li.textContent.trim() === "Seace 3");
+                    if (option) {{
+                        option.click();
+                    }}
+                }}
+            ''')
+            logger.info("Version SEACE 'Seace 3' seleccionado")
+
+            await page.wait_for_timeout(500)
+
+            # PASO 2: Seleccionar el año
             year_dropdown_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:anioConvocatoria'
             await page.wait_for_function(
                 f'document.querySelector("#{year_dropdown_id_escaped}") !== null',
@@ -109,14 +135,15 @@ class SEACEService:
             )
             logger.info("Dropdown de año encontrado")
 
-            # Hacer clic en el dropdown usando JavaScript (bypass Playwright visibility check)
+            # Abrir dropdown de año
             await page.evaluate(f'''
                 document.querySelector("#{year_dropdown_id_escaped}").click();
             ''')
-            logger.info("Dropdown de año abierto (JavaScript click)")
+            logger.info("Dropdown de año abierto")
 
-            # Esperar a que aparezca el panel del dropdown y hacer clic en la opción usando JavaScript
             await page.wait_for_timeout(500)  # Esperar animación
+
+            # Seleccionar año
             await page.evaluate(f'''
                 const panel = document.querySelector("#{year_dropdown_id_escaped}_panel");
                 if (panel) {{
@@ -126,11 +153,21 @@ class SEACEService:
                     }}
                 }}
             ''')
-            logger.info(f"Año seleccionado: {anio} (JavaScript click)")
+            logger.info(f"Año seleccionado: {anio}")
 
-            # NO ingresar el CUI - buscar solo por año
-            # El campo CUI en SEACE no funciona correctamente para búsquedas
-            logger.info("Búsqueda solo por año (sin CUI)")
+            await page.wait_for_timeout(500)
+
+            # PASO 3: Ingresar el CUI
+            cui_input_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
+            await page.evaluate(f'''
+                const cuiInput = document.querySelector("#{cui_input_id_escaped}");
+                if (cuiInput) {{
+                    cuiInput.value = "{cui}";
+                    cuiInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    cuiInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+            ''')
+            logger.info(f"CUI ingresado: {cui}")
 
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
             await page.wait_for_timeout(2000)  # Esperar estabilización del formulario
@@ -182,52 +219,32 @@ class SEACEService:
                 'document.evaluate("//text()[contains(., \'Acciones\')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue !== null',
                 timeout=10000
             )
-            logger.info("Resultados de búsqueda cargados completamente")
-
-            # Buscar la fila que contenga el CUI en la descripción
-            logger.info(f"Buscando fila con CUI {cui} en los resultados")
-            fila_encontrada = await page.evaluate(f'''
-                (() => {{
-                    const rows = document.querySelectorAll('#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos table tbody tr');
-                    for (let row of rows) {{
-                        const descripcionCell = row.querySelector('td:nth-child(8)'); // Columna "Descripción de Objeto"
-                        if (descripcionCell && descripcionCell.textContent.includes('CUI {cui}')) {{
-                            return true;
-                        }}
-                    }}
-                    return false;
-                }})()
-            ''')
-
-            if not fila_encontrada:
-                raise ExtractionException(f"No se encontró ninguna obra con CUI {cui} en los resultados del año {anio}")
+            logger.info(f"Resultados de búsqueda cargados completamente para CUI {cui}, año {anio}")
 
         except Exception as e:
             logger.error(f"Error ejecutando búsqueda: {str(e)}")
             raise ExtractionException(f"Error ejecutando búsqueda: {str(e)}")
     
     async def _navegar_a_historial(self, page: Page, cui: str):
-        """Navega al historial de contratación de la obra con el CUI especificado"""
+        """Navega al historial de contratación (primer resultado, ya filtrado por CUI)"""
         logger.info(f"Navegando a historial de contratación para CUI {cui}")
 
         try:
-            # Buscar la fila que contenga el CUI y hacer clic en su ícono de historial
-            historial_clicked = await page.evaluate(f'''
-                (() => {{
+            # Como ya buscamos con CUI, solo hacer clic en el primer ícono de historial
+            historial_clicked = await page.evaluate('''
+                (() => {
                     const rows = document.querySelectorAll('#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos table tbody tr');
-                    for (let row of rows) {{
-                        const descripcionCell = row.querySelector('td:nth-child(8)'); // Columna "Descripción de Objeto"
-                        if (descripcionCell && descripcionCell.textContent.includes('CUI {cui}')) {{
-                            // Encontrar el primer ícono (historial) en la columna de Acciones (última columna)
-                            const historialIcon = row.querySelector('td:last-child a.ui-commandlink:first-child');
-                            if (historialIcon) {{
-                                historialIcon.click();
-                                return true;
-                            }}
-                        }}
-                    }}
+                    if (rows.length > 0) {
+                        const firstRow = rows[0];
+                        // Encontrar el primer ícono (historial) en la columna de Acciones (última columna)
+                        const historialIcon = firstRow.querySelector('td:last-child a.ui-commandlink:first-child');
+                        if (historialIcon) {
+                            historialIcon.click();
+                            return true;
+                        }
+                    }
                     return false;
-                }})()
+                })()
             ''')
 
             if not historial_clicked:
