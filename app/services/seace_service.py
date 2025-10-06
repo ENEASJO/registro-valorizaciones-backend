@@ -127,6 +127,12 @@ class SEACEService:
 
             await page.wait_for_timeout(500)
 
+            # Verificar qué año quedó seleccionado
+            selected_year = await page.evaluate(f'''
+                document.querySelector("#{year_dropdown_id_escaped}_label")?.textContent || "NO ENCONTRADO"
+            ''')
+            logger.info(f"VERIFICACIÓN: Año en formulario después de selección: {selected_year}")
+
             # PASO 2: Ingresar el CUI
             cui_input_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
             await page.evaluate(f'''
@@ -138,6 +144,12 @@ class SEACEService:
                 }}
             ''')
             logger.info(f"CUI ingresado: {cui}")
+
+            # Verificar qué CUI quedó en el campo
+            actual_cui = await page.evaluate(f'''
+                document.querySelector("#{cui_input_id_escaped}")?.value || "NO ENCONTRADO"
+            ''')
+            logger.info(f"VERIFICACIÓN: CUI en formulario después de ingreso: {actual_cui}")
 
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
             await page.wait_for_timeout(3000)  # Esperar estabilización del formulario (aumentado de 2s a 3s)
