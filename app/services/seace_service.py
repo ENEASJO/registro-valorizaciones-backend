@@ -102,8 +102,8 @@ class SEACEService:
         logger.info(f"VERIFICACIÓN: Version SEACE por defecto en headless: {version_seace_value}")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
-        """Ejecuta la búsqueda SOLO por año en SEACE (el CUI se filtrará después en los resultados)"""
-        logger.info(f"Ejecutando búsqueda SOLO por año={anio} (CUI {cui} se filtrará en resultados)")
+        """Ejecuta la búsqueda por año + Código SNIP en SEACE"""
+        logger.info(f"NUEVA ESTRATEGIA: Ejecutando búsqueda por año={anio} + Código SNIP={cui}")
 
         try:
             # PASO 1: Seleccionar el año
@@ -142,9 +142,29 @@ class SEACEService:
             ''')
             logger.info(f"VERIFICACIÓN: Año en formulario después de selección: {selected_year}")
 
-            # NOTA: NO llenamos el campo CUI porque no funciona en headless mode
-            # El filtrado por CUI se hará después buscando en los resultados
-            logger.info(f"ESTRATEGIA: Buscar por año y filtrar CUI {cui} en resultados (campo CUI no funciona en headless)")
+            # PASO 2: Llenar campo Código SNIP
+            snip_input_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:codigoSnip'
+            await page.wait_for_function(
+                f'document.querySelector("#{snip_input_id_escaped}") !== null',
+                timeout=30000
+            )
+            logger.info("Campo Código SNIP encontrado")
+
+            await page.evaluate(f'''
+                const snipInput = document.querySelector("#{snip_input_id_escaped}");
+                if (snipInput) {{
+                    snipInput.value = "{cui}";
+                    snipInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    snipInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+            ''')
+            logger.info(f"Código SNIP {cui} ingresado")
+
+            # Verificar que el valor quedó ingresado
+            snip_value = await page.evaluate(f'''
+                document.querySelector("#{snip_input_id_escaped}")?.value || "NO ENCONTRADO"
+            ''')
+            logger.info(f"VERIFICACIÓN: Código SNIP en formulario: {snip_value}")
 
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
             await page.wait_for_timeout(2000)  # Esperar estabilización del formulario
@@ -186,7 +206,7 @@ class SEACEService:
                 if paginator:
                     paginator_text = await paginator.inner_text()
                     logger.error(f"Timeout esperando resultados. Paginador: {paginator_text}")
-                    raise ExtractionException(f"No se encontraron resultados en SEACE para el año {anio}.")
+                    raise ExtractionException(f"No se encontraron resultados en SEACE para año={anio} + Código SNIP={cui}.")
                 else:
                     logger.error("Timeout: paginador no encontrado")
                     raise ExtractionException("Timeout esperando paginador de resultados")
@@ -196,7 +216,7 @@ class SEACEService:
                 'document.evaluate("//text()[contains(., \'Acciones\')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue !== null',
                 timeout=10000
             )
-            logger.info(f"Resultados de búsqueda cargados para año {anio}. Ahora se filtrará por CUI {cui}")
+            logger.info(f"Resultados de búsqueda cargados para año={anio} + SNIP={cui}. Buscando CUI {cui} en resultados")
 
         except Exception as e:
             logger.error(f"Error ejecutando búsqueda: {str(e)}")
