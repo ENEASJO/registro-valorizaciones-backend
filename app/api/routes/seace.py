@@ -1,16 +1,40 @@
 """
 Endpoints para consulta SEACE (Sistema Electrónico de Contrataciones del Estado)
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import Dict, Any
 import logging
+import asyncio
 
 from app.models.seace import SEACEInput, ObraSEACE, ErrorResponseSEACE
 from app.services.seace_service import seace_service
+from app.services.job_manager import job_manager, JobStatus
 from app.utils.exceptions import BaseAppException
 
 logger = logging.getLogger(__name__)
+
+
+async def process_seace_job(job_id: str, cui: str, anio: int):
+    """Procesa un job de SEACE en segundo plano"""
+    try:
+        logger.info(f"Iniciando procesamiento de job {job_id} para CUI {cui}, año {anio}")
+        job_manager.update_status(job_id, JobStatus.RUNNING)
+
+        # Ejecutar scraping
+        resultado = await seace_service.consultar_obra(cui, anio)
+
+        # Guardar resultado
+        job_manager.set_result(job_id, resultado)
+        logger.info(f"Job {job_id} completado exitosamente")
+
+    except BaseAppException as e:
+        logger.error(f"Error de aplicación en job {job_id}: {str(e)}")
+        job_manager.set_error(job_id, e.message, e.details)
+
+    except Exception as e:
+        logger.error(f"Error inesperado en job {job_id}: {str(e)}")
+        job_manager.set_error(job_id, "Error inesperado", str(e))
 
 router = APIRouter(
     prefix="/api/v1/seace",
@@ -25,11 +49,112 @@ router = APIRouter(
 
 
 @router.post(
+    "/consultar-async",
+    summary="Iniciar consulta asíncrona de obra en SEACE",
+    description="Crea un job para consultar información de una obra en SEACE. Retorna un job_id para consultar el estado.",
+    response_description="ID del job creado"
+)
+async def consultar_obra_seace_async(seace_input: SEACEInput, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+    """
+    Inicia una consulta asíncrona de obra en SEACE
+
+    - **cui**: Código Único de Inversión (7-10 dígitos)
+    - **anio**: Año de la convocatoria (2000-2100)
+
+    Retorna:
+    - job_id: ID del job para consultar el estado
+    - status: Estado inicial del job (pending)
+    - message: Mensaje informativo
+    """
+    try:
+        # Crear job
+        job_id = job_manager.create_job(seace_input.cui, seace_input.anio)
+
+        # Iniciar procesamiento en segundo plano
+        background_tasks.add_task(process_seace_job, job_id, seace_input.cui, seace_input.anio)
+
+        logger.info(f"Job {job_id} creado para CUI {seace_input.cui}, año {seace_input.anio}")
+
+        return {
+            "job_id": job_id,
+            "status": "pending",
+            "message": f"Consulta iniciada para CUI {seace_input.cui}, año {seace_input.anio}",
+            "check_status_url": f"/api/v1/seace/job/{job_id}"
+        }
+
+    except Exception as e:
+        logger.error(f"Error creando job para CUI {seace_input.cui}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": True,
+                "message": "Error al crear job de consulta",
+                "details": str(e)
+            }
+        )
+
+
+@router.get(
+    "/job/{job_id}",
+    summary="Consultar estado de un job de SEACE",
+    description="Obtiene el estado y resultado de un job de consulta SEACE",
+    response_description="Estado del job y resultado si está completado"
+)
+async def get_job_status(job_id: str) -> Dict[str, Any]:
+    """
+    Consulta el estado de un job de SEACE
+
+    - **job_id**: ID del job a consultar
+
+    Retorna:
+    - job_id: ID del job
+    - status: Estado actual (pending, running, completed, failed)
+    - result: Resultado de la consulta (solo si status=completed)
+    - error: Mensaje de error (solo si status=failed)
+    """
+    job = job_manager.get_job(job_id)
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": True,
+                "message": f"Job {job_id} no encontrado",
+                "details": "El job no existe o ha expirado"
+            }
+        )
+
+    response = {
+        "job_id": job.job_id,
+        "status": job.status.value,
+        "cui": job.cui,
+        "anio": job.anio,
+        "created_at": job.created_at.isoformat()
+    }
+
+    if job.started_at:
+        response["started_at"] = job.started_at.isoformat()
+
+    if job.completed_at:
+        response["completed_at"] = job.completed_at.isoformat()
+
+    if job.status == JobStatus.COMPLETED and job.result:
+        response["result"] = job.result.dict()
+
+    if job.status == JobStatus.FAILED:
+        response["error"] = job.error
+        if job.error_details:
+            response["error_details"] = job.error_details
+
+    return response
+
+
+@router.post(
     "/consultar",
     response_model=ObraSEACE,
-    summary="Consultar obra en SEACE por CUI y año",
-    description="Consulta información detallada de una obra en SEACE usando CUI y año de convocatoria",
-    response_description="Información completa de la obra incluyendo nomenclatura, normativa, descripción y monto"
+    summary="Consultar obra en SEACE por CUI y año (síncrono)",
+    description="Consulta información detallada de una obra en SEACE. ADVERTENCIA: Puede exceder timeout de 30s. Usar /consultar-async para operaciones confiables.",
+    response_description="Información completa de la obra"
 )
 async def consultar_obra_seace(seace_input: SEACEInput) -> ObraSEACE:
     """
