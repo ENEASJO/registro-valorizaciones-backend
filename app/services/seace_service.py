@@ -83,14 +83,14 @@ class SEACEService:
         await page.wait_for_timeout(8000)
         logger.info("Esperando inicialización del formulario (8 segundos)")
 
-        # Verificar que el campo CUI sea visible usando JavaScript (offsetParent check)
+        # Verificar que el campo CUI exista (sin validar visibilidad estricta)
         # Los dos puntos en IDs JSF deben escaparse en querySelector
         cui_input_id = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
         await page.wait_for_function(
-            f'document.querySelector("#{cui_input_id}") && document.querySelector("#{cui_input_id}").offsetParent !== null',
+            f'document.querySelector("#{cui_input_id}") !== null',
             timeout=30000
         )
-        logger.info("Campo CUI visible - Página SEACE cargada correctamente")
+        logger.info("Campo CUI encontrado - Página SEACE cargada correctamente")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
         """Ejecuta la búsqueda por CUI y año en SEACE"""
