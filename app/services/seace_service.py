@@ -324,22 +324,29 @@ class SEACEService:
             raise ExtractionException(f"Error extrayendo datos completos: {str(e)}")
 
     async def _extraer_texto_por_label(self, page: Page, label: str) -> Optional[str]:
-        """Extrae el texto asociado a un label específico"""
+        """Extrae el texto asociado a un label específico usando estructura de tabla"""
         try:
-            # Buscar el elemento que contiene el label
-            selector = f'span.ui-outputlabel:text-is("{label}") ~ span.halfSizeText'
+            # Buscar todas las filas de tabla
+            rows = await page.query_selector_all('tr')
 
-            # Intentar encontrar el elemento
-            element = await page.query_selector(selector)
+            for row in rows:
+                # Buscar las celdas de la fila
+                cells = await row.query_selector_all('td')
+                if len(cells) >= 2:
+                    # Primera celda contiene el label
+                    label_text = await cells[0].inner_text()
+                    label_text = label_text.strip()
 
-            if element:
-                texto = await element.inner_text()
-                texto = texto.strip()
-                logger.info(f"Extraído {label}: {texto}")
-                return texto
-            else:
-                logger.warning(f"No se encontró el elemento para {label}")
-                return None
+                    # Comparar con el label buscado (con o sin ":")
+                    if label_text == label or label_text == f"{label}:":
+                        # Segunda celda contiene el valor
+                        value_text = await cells[1].inner_text()
+                        value_text = value_text.strip()
+                        logger.info(f"Extraído {label}: {value_text}")
+                        return value_text
+
+            logger.warning(f"No se encontró el elemento para {label}")
+            return None
 
         except Exception as e:
             logger.warning(f"Error extrayendo {label}: {str(e)}")
