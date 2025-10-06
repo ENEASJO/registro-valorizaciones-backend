@@ -182,7 +182,7 @@ class SEACEService:
                     raise ExtractionException(f"No se encontraron resultados en SEACE para CUI {cui} en el año {anio}. Verifica que el CUI y el año sean correctos.")
 
             # Confirmar que la columna "Acciones" está visible
-            await page.wait_for_selector('span.ui-outputlabel:text-is("Acciones")', timeout=10000, state='visible')
+            await page.wait_for_selector('text=Acciones', timeout=10000, state='visible')
             logger.info("Resultados de búsqueda cargados completamente")
 
         except Exception as e:
@@ -256,7 +256,7 @@ class SEACEService:
             logger.info("Clic en 'Ver integrantes'")
 
             # Esperar a que cargue la página
-            await page.wait_for_selector('span.ui-outputlabel:text-is("Tipo de documento")', timeout=30000, state='visible')
+            await page.wait_for_selector('text=Tipo de documento', timeout=30000, state='visible')
             logger.info("Página integrantes cargada")
 
         except Exception as e:
