@@ -128,10 +128,17 @@ class SEACEService:
             ''')
             logger.info(f"Año seleccionado: {anio} (JavaScript click)")
 
-            # Ingresar el CUI usando el ID exacto del campo
-            cui_input_id = 'tbBuscador\\:idFormBuscarProceso\\:CUI'
-            await page.fill(f'#{cui_input_id}', cui)
-            logger.info(f"CUI ingresado: {cui}")
+            # Ingresar el CUI usando JavaScript (bypass visibility check)
+            cui_input_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
+            await page.evaluate(f'''
+                const cuiInput = document.querySelector("#{cui_input_id_escaped}");
+                if (cuiInput) {{
+                    cuiInput.value = "{cui}";
+                    cuiInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    cuiInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+            ''')
+            logger.info(f"CUI ingresado: {cui} (JavaScript)")
             
             # Hacer clic en el botón "Buscar"
             # Esperar a que el botón esté visible y habilitado
