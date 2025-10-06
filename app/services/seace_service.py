@@ -133,15 +133,15 @@ class SEACEService:
 
             # Cambiar el año - es un componente PrimeFaces, no un select nativo
             # Hacer clic para abrir el dropdown
-            year_dropdown = '#tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
-            await page.click(year_dropdown)
+            year_dropdown_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
+            await page.click(f'#{year_dropdown_id}')
             logger.info("Dropdown de año abierto")
 
             # Esperar a que aparezcan las opciones
             await page.wait_for_timeout(500)
 
             # Hacer clic en la opción del año
-            year_option = f'#{year_dropdown}_panel li[data-label="{anio}"]'
+            year_option = f'#{year_dropdown_id}_panel li[data-label="{anio}"]'
             await page.click(year_option)
             logger.info(f"Año {anio} seleccionado")
 
