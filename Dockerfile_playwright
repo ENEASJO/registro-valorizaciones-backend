@@ -33,7 +33,7 @@ RUN pip install fastapi uvicorn playwright python-dotenv
 RUN python -m playwright install chromium
 
 # Copiar aplicación
-COPY main_with_playwright.py main.py
+COPY main.py main.py
 COPY app/ app/
 
 # Cambiar a usuario no-root
