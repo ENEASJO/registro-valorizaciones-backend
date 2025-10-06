@@ -91,6 +91,15 @@ class SEACEService:
             timeout=30000
         )
         logger.info("Campo CUI encontrado - Página SEACE cargada correctamente")
+
+        # Verificar qué valor tiene "Version SEACE" por defecto en headless
+        version_seace_value = await page.evaluate('''
+            (() => {
+                const versionDropdown = document.querySelector('#tbBuscador\\\\:idFormBuscarProceso\\\\:j_idt227_label');
+                return versionDropdown ? versionDropdown.textContent : "NO ENCONTRADO";
+            })()
+        ''')
+        logger.info(f"VERIFICACIÓN: Version SEACE por defecto en headless: {version_seace_value}")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
         """Ejecuta la búsqueda por CUI y año en SEACE (Version SEACE ya viene en 'Seace 3' por defecto)"""
