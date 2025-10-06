@@ -163,10 +163,12 @@ class SEACEService:
             try:
                 await page.wait_for_function(
                     '''
-                    const paginator = document.querySelector("#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current");
-                    if (!paginator) return false;
-                    const text = paginator.textContent.toLowerCase();
-                    return !text.includes('total 0') && !text.includes('0 a 0');
+                    (() => {
+                        const paginator = document.querySelector("#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current");
+                        if (!paginator) return false;
+                        const text = paginator.textContent.toLowerCase();
+                        return !text.includes('total 0') && !text.includes('0 a 0');
+                    })()
                     ''',
                     timeout=30000
                 )
