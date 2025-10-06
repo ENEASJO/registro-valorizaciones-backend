@@ -109,9 +109,11 @@ class SEACEService:
             )
             logger.info("Dropdown de año encontrado")
 
-            # Hacer clic en el dropdown para abrirlo (force=True para bypass visibility check)
-            await page.click(f'#{year_dropdown_id}', force=True)
-            logger.info("Dropdown de año abierto")
+            # Hacer clic en el dropdown usando JavaScript (bypass Playwright visibility check)
+            await page.evaluate(f'''
+                document.querySelector("#{year_dropdown_id_escaped}").click();
+            ''')
+            logger.info("Dropdown de año abierto (JavaScript click)")
 
             # Esperar a que aparezca el panel del dropdown y hacer clic en la opción
             await page.wait_for_timeout(500)  # Esperar animación
