@@ -166,6 +166,11 @@ class SEACEService:
             await page.wait_for_selector('text=Mostrando de', timeout=45000, state='visible')
             logger.info("Tabla de resultados encontrada")
 
+            # Esperar tiempo adicional para que SEACE termine de procesar la búsqueda
+            # SEACE puede mostrar "0 a 0" inicialmente y luego actualizar a los resultados reales
+            await page.wait_for_timeout(3000)
+            logger.info("Esperando finalización de procesamiento SEACE")
+
             # Verificar que haya resultados (no "0 a 0 del total 0")
             paginator = await page.query_selector('.ui-paginator-current')
             if paginator:
