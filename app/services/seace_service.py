@@ -125,7 +125,7 @@ class SEACEService:
 
         try:
             # Llenar el campo CUI
-            cui_input = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:codigoCUI', timeout=10000)
+            cui_input = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:codigoCUI', timeout=30000)
             await cui_input.fill(cui)
             logger.info(f"CUI {cui} ingresado")
             await page.wait_for_timeout(1000)
@@ -142,7 +142,7 @@ class SEACEService:
             await page.wait_for_timeout(1000)
 
             # Hacer clic en el botón Buscar
-            buscar_button = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSel', timeout=10000)
+            buscar_button = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSel', timeout=30000)
             await buscar_button.click()
             logger.info("Botón Buscar clickeado")
 
@@ -163,7 +163,7 @@ class SEACEService:
             # Este es el ícono de "Visualizar historial de contratación"
             historial_icon = await page.wait_for_selector(
                 'td.ui-dt-c:has(span.ui-outputlabel:text-is("Acciones")) ~ td a.ui-commandlink:nth-child(3)',
-                timeout=10000
+                timeout=30000
             )
             await historial_icon.click()
             logger.info("Clic en ícono de historial")
@@ -185,7 +185,7 @@ class SEACEService:
             # Este es el ícono de "Ficha de Selección"
             ficha_icon = await page.wait_for_selector(
                 'table.ui-datatable-data tr:first-child td a.ui-commandlink:nth-child(2)',
-                timeout=10000
+                timeout=30000
             )
             await ficha_icon.click()
             logger.info("Clic en ícono de ficha de selección")
@@ -206,7 +206,7 @@ class SEACEService:
             # Buscar y hacer clic en el enlace "Ver integrantes y encargado"
             integrantes_link = await page.wait_for_selector(
                 'a:has-text("Ver integrantes y encargado")',
-                timeout=10000
+                timeout=30000
             )
             await integrantes_link.click()
             logger.info("Clic en 'Ver integrantes y encargado'")
