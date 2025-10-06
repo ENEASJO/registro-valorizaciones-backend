@@ -102,33 +102,37 @@ class SEACEService:
         logger.info(f"VERIFICACIÓN: Version SEACE por defecto en headless: {version_seace_value}")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
-        """Ejecuta la búsqueda SOLO por CUI en SEACE (búsqueda de texto libre)"""
-        logger.info(f"ESTRATEGIA PAGINACIÓN: Ejecutando búsqueda por CUI={cui} (texto libre, se paginará para encontrar exacto)")
+        """Ejecuta la búsqueda SOLO por año en SEACE (estrategia año-only como test_seace_node.js PRUEBA 2)"""
+        logger.info(f"ESTRATEGIA AÑO-ONLY: Buscando por año={anio}, luego paginar para CUI exacto {cui}")
 
         try:
-            # Llenar campo CUI (búsqueda de texto libre - puede devolver hasta 499 resultados)
-            cui_input_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
-            await page.wait_for_function(
-                f'document.querySelector("#{cui_input_id_escaped}") !== null',
-                timeout=30000
-            )
-            logger.info("Campo CUI encontrado")
+            # Seleccionar año en dropdown (igual que test_seace_node.js PRUEBA 2)
+            year_dropdown_id = 'tbBuscador\\\\:idFormBuscarProceso\\\\:anioConvocatoria'
 
+            # Click en dropdown para abrirlo
             await page.evaluate(f'''
-                const cuiInput = document.querySelector("#{cui_input_id_escaped}");
-                if (cuiInput) {{
-                    cuiInput.value = "{cui}";
-                    cuiInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    cuiInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                document.querySelector("#{year_dropdown_id}").click();
+            ''')
+            await page.wait_for_timeout(500)
+            logger.info(f"Dropdown de año abierto")
+
+            # Seleccionar opción {anio} del panel
+            await page.evaluate(f'''
+                const panel = document.querySelector("#{year_dropdown_id}_panel");
+                if (panel) {{
+                    const option = Array.from(panel.querySelectorAll('li')).find(li => li.textContent.trim() === '{anio}');
+                    if (option) {{
+                        option.click();
+                    }}
                 }}
             ''')
-            logger.info(f"CUI {cui} ingresado")
+            logger.info(f"Año {anio} seleccionado")
 
-            # Verificar que el valor quedó ingresado
-            cui_value = await page.evaluate(f'''
-                document.querySelector("#{cui_input_id_escaped}")?.value || "NO ENCONTRADO"
+            # Verificar que el valor quedó seleccionado
+            anio_value = await page.evaluate(f'''
+                document.querySelector("#{year_dropdown_id}_label")?.textContent || "NO ENCONTRADO"
             ''')
-            logger.info(f"VERIFICACIÓN: CUI en formulario: {cui_value}")
+            logger.info(f"VERIFICACIÓN: Año en formulario: {anio_value}")
 
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
             await page.wait_for_timeout(2000)  # Esperar estabilización del formulario
@@ -170,7 +174,7 @@ class SEACEService:
                 if paginator:
                     paginator_text = await paginator.inner_text()
                     logger.error(f"Timeout esperando resultados. Paginador: {paginator_text}")
-                    raise ExtractionException(f"No se encontraron resultados en SEACE para CUI={cui}.")
+                    raise ExtractionException(f"No se encontraron resultados en SEACE para año={anio}.")
                 else:
                     logger.error("Timeout: paginador no encontrado")
                     raise ExtractionException("Timeout esperando paginador de resultados")
