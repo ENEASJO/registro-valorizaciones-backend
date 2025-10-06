@@ -85,6 +85,9 @@ class SEACEService:
         try:
             # Seleccionar el año - PrimeFaces dropdown (click to open, then select)
             year_dropdown_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
+
+            # Wait for dropdown to be visible before clicking
+            await page.wait_for_selector(f'#{year_dropdown_id}', timeout=30000, state='visible')
             await page.click(f'#{year_dropdown_id}')
             logger.info("Dropdown de año abierto")
 
