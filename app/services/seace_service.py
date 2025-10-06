@@ -47,10 +47,10 @@ class SEACEService:
                 
                 # Ejecutar búsqueda
                 await self._ejecutar_busqueda(page, cui, anio)
-                
+
                 # Navegar al historial
-                await self._navegar_a_historial(page)
-                
+                await self._navegar_a_historial(page, cui)
+
                 # Navegar a la ficha de selección
                 await self._navegar_a_ficha_seleccion(page)
                 
@@ -93,8 +93,8 @@ class SEACEService:
         logger.info("Campo CUI encontrado - Página SEACE cargada correctamente")
     
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
-        """Ejecuta la búsqueda por CUI y año en SEACE"""
-        logger.info(f"Ejecutando búsqueda: CUI={cui}, Año={anio}")
+        """Ejecuta la búsqueda por año en SEACE (el CUI se busca en los resultados)"""
+        logger.info(f"Ejecutando búsqueda: Año={anio} (el CUI {cui} se buscará en los resultados)")
 
         try:
             # Seleccionar el año - PrimeFaces dropdown (click to open, then select)
@@ -128,20 +128,12 @@ class SEACEService:
             ''')
             logger.info(f"Año seleccionado: {anio} (JavaScript click)")
 
-            # Ingresar el CUI usando JavaScript (bypass visibility check)
-            cui_input_id_escaped = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
-            await page.evaluate(f'''
-                const cuiInput = document.querySelector("#{cui_input_id_escaped}");
-                if (cuiInput) {{
-                    cuiInput.value = "{cui}";
-                    cuiInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    cuiInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                }}
-            ''')
-            logger.info(f"CUI ingresado: {cui} (JavaScript)")
-            
+            # NO ingresar el CUI - buscar solo por año
+            # El campo CUI en SEACE no funciona correctamente para búsquedas
+            logger.info("Búsqueda solo por año (sin CUI)")
+
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
-            await page.wait_for_timeout(2000)  # Esperar estabilización del formulario (aumentado)
+            await page.wait_for_timeout(2000)  # Esperar estabilización del formulario
             button_clicked = await page.evaluate('''
                 (() => {
                     const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
@@ -180,7 +172,7 @@ class SEACEService:
                 if paginator:
                     paginator_text = await paginator.inner_text()
                     logger.error(f"Timeout esperando resultados. Paginador: {paginator_text}")
-                    raise ExtractionException(f"No se encontraron resultados en SEACE para CUI {cui} en el año {anio}. Verifica que el CUI y el año sean correctos.")
+                    raise ExtractionException(f"No se encontraron resultados en SEACE para el año {anio}.")
                 else:
                     logger.error("Timeout: paginador no encontrado")
                     raise ExtractionException("Timeout esperando paginador de resultados")
@@ -192,35 +184,61 @@ class SEACEService:
             )
             logger.info("Resultados de búsqueda cargados completamente")
 
+            # Buscar la fila que contenga el CUI en la descripción
+            logger.info(f"Buscando fila con CUI {cui} en los resultados")
+            fila_encontrada = await page.evaluate(f'''
+                (() => {{
+                    const rows = document.querySelectorAll('#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos table tbody tr');
+                    for (let row of rows) {{
+                        const descripcionCell = row.querySelector('td:nth-child(8)'); // Columna "Descripción de Objeto"
+                        if (descripcionCell && descripcionCell.textContent.includes('CUI {cui}')) {{
+                            return true;
+                        }}
+                    }}
+                    return false;
+                }})()
+            ''')
+
+            if not fila_encontrada:
+                raise ExtractionException(f"No se encontró ninguna obra con CUI {cui} en los resultados del año {anio}")
+
         except Exception as e:
             logger.error(f"Error ejecutando búsqueda: {str(e)}")
             raise ExtractionException(f"Error ejecutando búsqueda: {str(e)}")
     
-    async def _navegar_a_historial(self, page: Page):
-        """Navega al historial de contratación (primer ícono en Acciones)"""
-        logger.info("Navegando a historial de contratación")
-        
+    async def _navegar_a_historial(self, page: Page, cui: str):
+        """Navega al historial de contratación de la obra con el CUI especificado"""
+        logger.info(f"Navegando a historial de contratación para CUI {cui}")
+
         try:
-            # Buscar la tabla de resultados
-            tabla_resultados = await page.wait_for_selector(
-                '#tbBuscador\\:idFormBuscarProceso\\:pnlGrdResultadosProcesos table tbody tr:last-child',
-                timeout=30000,
-                state='visible'
-            )
-            
-            # Buscar el primer ícono (historial) en la columna de Acciones
-            historial_icon = await tabla_resultados.query_selector('td:last-child a.ui-commandlink:first-child')
-            
-            if not historial_icon:
-                raise ExtractionException("No se encontró el ícono de historial")
-            
-            await historial_icon.click()
-            logger.info("Clic en ícono de historial")
-            
+            # Buscar la fila que contenga el CUI y hacer clic en su ícono de historial
+            historial_clicked = await page.evaluate(f'''
+                (() => {{
+                    const rows = document.querySelectorAll('#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos table tbody tr');
+                    for (let row of rows) {{
+                        const descripcionCell = row.querySelector('td:nth-child(8)'); // Columna "Descripción de Objeto"
+                        if (descripcionCell && descripcionCell.textContent.includes('CUI {cui}')) {{
+                            // Encontrar el primer ícono (historial) en la columna de Acciones (última columna)
+                            const historialIcon = row.querySelector('td:last-child a.ui-commandlink:first-child');
+                            if (historialIcon) {{
+                                historialIcon.click();
+                                return true;
+                            }}
+                        }}
+                    }}
+                    return false;
+                }})()
+            ''')
+
+            if not historial_clicked:
+                raise ExtractionException(f"No se pudo hacer clic en el ícono de historial para CUI {cui}")
+
+            logger.info(f"Clic en ícono de historial para CUI {cui}")
+
             # Esperar a que cargue el historial - buscar por texto "Visualizar historial"
             await page.wait_for_selector('text=Visualizar historial de contratación', timeout=30000, state='visible')
             logger.info("Historial cargado")
-            
+
         except Exception as e:
             logger.error(f"Error navegando a historial: {str(e)}")
             raise ExtractionException(f"Error navegando a historial: {str(e)}")
