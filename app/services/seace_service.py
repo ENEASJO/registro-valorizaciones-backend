@@ -106,7 +106,27 @@ class SEACEService:
         logger.info(f"ESTRATEGIA AÑO-ONLY: Buscando por año={anio}, luego paginar para CUI exacto {cui}")
 
         try:
-            # Seleccionar año en dropdown (igual que test_seace_node.js PRUEBA 2)
+            # PASO 1: Seleccionar explícitamente "Seace 3" en Version SEACE (puede ser necesario en headless)
+            version_dropdown_id = 'tbBuscador\\\\:idFormBuscarProceso\\\\:j_idt227'
+            await page.evaluate(f'''
+                document.querySelector("#{version_dropdown_id}").click();
+            ''')
+            await page.wait_for_timeout(500)
+            logger.info("Dropdown de Version SEACE abierto")
+
+            await page.evaluate(f'''
+                const panel = document.querySelector("#{version_dropdown_id}_panel");
+                if (panel) {{
+                    const option = Array.from(panel.querySelectorAll('li')).find(li => li.textContent.trim() === 'Seace 3');
+                    if (option) {{
+                        option.click();
+                    }}
+                }}
+            ''')
+            logger.info("Version SEACE 'Seace 3' seleccionada explícitamente")
+            await page.wait_for_timeout(1000)
+
+            # PASO 2: Seleccionar año en dropdown (igual que test_seace_node.js PRUEBA 2)
             year_dropdown_id = 'tbBuscador\\\\:idFormBuscarProceso\\\\:anioConvocatoria'
 
             # Click en dropdown para abrirlo
@@ -135,7 +155,7 @@ class SEACEService:
             logger.info(f"VERIFICACIÓN: Año en formulario: {anio_value}")
 
             # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
-            await page.wait_for_timeout(2000)  # Esperar estabilización del formulario
+            await page.wait_for_timeout(5000)  # Esperar estabilización del formulario (aumentado a 5s)
             button_clicked = await page.evaluate('''
                 (() => {
                     const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
