@@ -63,22 +63,18 @@ class SEACEService:
 
                 # Navegar a SEACE
                 logger.info("Navegando a página principal de SEACE")
-                await page.goto(self.base_url, timeout=self.timeout, wait_until='networkidle')
-                logger.info("Página SEACE cargada, esperando que termine de cargar completamente")
-
-                # Esperar a que la página esté completamente cargada
-                await page.wait_for_load_state('domcontentloaded')
-                await page.wait_for_load_state('load')
+                await page.goto(self.base_url, timeout=60000, wait_until='domcontentloaded')
+                logger.info("Página SEACE cargada")
 
                 # Hacer clic en la pestaña "Buscador de Procedimientos de Selección"
                 logger.info("Haciendo clic en pestaña de búsqueda de procedimientos")
-                await page.click('a:has-text("Buscador de Procedimientos de Selección")', timeout=30000)
-                logger.info("Pestaña clickeada, esperando carga del formulario")
+                await page.click('a:has-text("Buscador de Procedimientos de Selección")', timeout=20000)
+                logger.info("Pestaña clickeada")
 
-                # Esperar a que aparezca el formulario de búsqueda como indicador de carga completa
-                logger.info("Esperando que el formulario de búsqueda esté disponible")
-                await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:CUI', timeout=90000, state='visible')
-                logger.info("Formulario de búsqueda disponible")
+                # Esperar a que aparezca el formulario de búsqueda
+                logger.info("Esperando formulario de búsqueda")
+                await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:CUI', timeout=60000, state='visible')
+                logger.info("Formulario disponible")
 
                 # Realizar búsqueda
                 await self._ejecutar_busqueda(page, cui, anio)
@@ -130,11 +126,10 @@ class SEACEService:
         logger.info(f"Ejecutando búsqueda para CUI: {cui}, Año: {anio}")
 
         try:
-            # Llenar el campo CUI (ya deberíamos tenerlo disponible desde la carga inicial)
-            cui_input = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:CUI', timeout=90000, state='visible')
+            # Llenar el campo CUI (ya está visible del paso anterior)
+            cui_input = await page.query_selector('#tbBuscador\\:idFormBuscarProceso\\:CUI')
             await cui_input.fill(cui)
             logger.info(f"CUI {cui} ingresado")
-            await page.wait_for_timeout(500)
 
             # Cambiar el año usando JavaScript
             await page.evaluate(f"""
@@ -145,32 +140,27 @@ class SEACEService:
                 }}
             """)
             logger.info(f"Año {anio} seleccionado")
-            await page.wait_for_timeout(500)
 
             # Hacer clic en el botón Buscar
-            buscar_button = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSelToken', timeout=90000, state='visible')
+            buscar_button = await page.query_selector('#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSelToken')
             await buscar_button.click()
             logger.info("Botón Buscar clickeado")
 
             # Esperar a que termine la actividad de red después del clic
             logger.info("Esperando que termine la actividad de red")
-            await page.wait_for_load_state('networkidle', timeout=120000)
-            logger.info("Actividad de red completada")
-
-            # Dar un pequeño tiempo adicional para que el DOM se actualice
-            await page.wait_for_timeout(2000)
+            try:
+                await page.wait_for_load_state('networkidle', timeout=45000)
+                logger.info("Actividad de red completada")
+            except Exception as e:
+                logger.warning(f"Timeout esperando networkidle: {str(e)}, continuando...")
 
             # Esperar a que aparezcan los resultados - buscar la tabla de resultados primero
             logger.info("Esperando que aparezcan los resultados de búsqueda")
-            try:
-                # Intentar primero esperar por la tabla de datos
-                await page.wait_for_selector('table.ui-datatable-data', timeout=30000, state='visible')
-                logger.info("Tabla de resultados encontrada")
-            except Exception as e:
-                logger.warning(f"No se encontró la tabla de datos directamente: {str(e)}")
+            await page.wait_for_selector('table.ui-datatable-data', timeout=45000, state='visible')
+            logger.info("Tabla de resultados encontrada")
 
-            # Luego esperar por la columna "Acciones" como confirmación final
-            await page.wait_for_selector('span.ui-outputlabel:text-is("Acciones")', timeout=30000, state='visible')
+            # Confirmar que la columna "Acciones" está visible
+            await page.wait_for_selector('span.ui-outputlabel:text-is("Acciones")', timeout=10000, state='visible')
             logger.info("Resultados de búsqueda cargados completamente")
 
         except Exception as e:
@@ -183,18 +173,17 @@ class SEACEService:
 
         try:
             # Buscar el tercer ícono en la columna de Acciones
-            # Este es el ícono de "Visualizar historial de contratación"
             historial_icon = await page.wait_for_selector(
                 'td.ui-dt-c:has(span.ui-outputlabel:text-is("Acciones")) ~ td a.ui-commandlink:nth-child(3)',
-                timeout=90000,
+                timeout=30000,
                 state='visible'
             )
             await historial_icon.click()
             logger.info("Clic en ícono de historial")
 
-            # Esperar a que cargue el historial - buscar la tabla de historial
-            await page.wait_for_selector('table.ui-datatable-data', timeout=90000, state='visible')
-            logger.info("Historial de contratación cargado")
+            # Esperar a que cargue el historial
+            await page.wait_for_selector('table.ui-datatable-data', timeout=30000, state='visible')
+            logger.info("Historial cargado")
 
         except Exception as e:
             logger.error(f"Error navegando a historial: {str(e)}")
@@ -206,40 +195,39 @@ class SEACEService:
 
         try:
             # Buscar el segundo ícono en la tabla de historial
-            # Este es el ícono de "Ficha de Selección"
             ficha_icon = await page.wait_for_selector(
                 'table.ui-datatable-data tr:first-child td a.ui-commandlink:nth-child(2)',
-                timeout=90000,
+                timeout=30000,
                 state='visible'
             )
             await ficha_icon.click()
-            logger.info("Clic en ícono de ficha de selección")
+            logger.info("Clic en ícono de ficha")
 
-            # Esperar a que cargue la ficha - buscar un elemento específico de la ficha
-            await page.wait_for_selector('span.ui-outputlabel:text-is("Nomenclatura")', timeout=90000, state='visible')
-            logger.info("Ficha de selección cargada")
+            # Esperar a que cargue la ficha
+            await page.wait_for_selector('span.ui-outputlabel:text-is("Nomenclatura")', timeout=30000, state='visible')
+            logger.info("Ficha cargada")
 
         except Exception as e:
-            logger.error(f"Error navegando a ficha de selección: {str(e)}")
-            raise ExtractionException(f"Error navegando a ficha de selección: {str(e)}")
+            logger.error(f"Error navegando a ficha: {str(e)}")
+            raise ExtractionException(f"Error navegando a ficha: {str(e)}")
 
     async def _navegar_a_integrantes(self, page: Page):
         """Navega a 'Ver integrantes y encargado' para extraer el número de contrato"""
         logger.info("Navegando a 'Ver integrantes y encargado'")
 
         try:
-            # Buscar y hacer clic en el enlace "Ver integrantes y encargado"
+            # Buscar y hacer clic en el enlace
             integrantes_link = await page.wait_for_selector(
                 'a:has-text("Ver integrantes y encargado")',
-                timeout=90000,
+                timeout=30000,
                 state='visible'
             )
             await integrantes_link.click()
-            logger.info("Clic en 'Ver integrantes y encargado'")
+            logger.info("Clic en 'Ver integrantes'")
 
-            # Esperar a que cargue la página - buscar el label "Tipo de documento"
-            await page.wait_for_selector('span.ui-outputlabel:text-is("Tipo de documento")', timeout=90000, state='visible')
-            logger.info("Página de integrantes cargada")
+            # Esperar a que cargue la página
+            await page.wait_for_selector('span.ui-outputlabel:text-is("Tipo de documento")', timeout=30000, state='visible')
+            logger.info("Página integrantes cargada")
 
         except Exception as e:
             logger.error(f"Error navegando a integrantes: {str(e)}")
