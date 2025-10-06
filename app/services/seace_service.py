@@ -81,50 +81,22 @@ class SEACEService:
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
         """Ejecuta la búsqueda por CUI y año en SEACE"""
         logger.info(f"Ejecutando búsqueda: CUI={cui}, Año={anio}")
-        
+
         try:
-            # Encontrar el campo de año y limpiar valor existente
-            anio_input = await page.query_selector('input[value*="202"]')  # Campo que contiene año
-            if anio_input:
-                # Limpiar el campo
-                await anio_input.click(click_count=3)  # Seleccionar todo
-                await page.keyboard.press('Backspace')
-                # Ingresar el año
-                await anio_input.type(str(anio))
-                logger.info(f"Año ingresado: {anio}")
-            
-            # Encontrar el campo de CUI (por placeholder o label asociado)
-            cui_inputs = await page.query_selector_all('input[type="text"]')
-            cui_ingresado = False
-            
-            for input_elem in cui_inputs:
-                # Verificar si es el campo correcto buscando el placeholder o valor vacío cerca de "Código Unico de Inversion"
-                input_id = await input_elem.get_attribute('id')
-                if input_id and 'cui' in input_id.lower():
-                    await input_elem.type(cui)
-                    cui_ingresado = True
-                    logger.info(f"CUI ingresado: {cui}")
-                    break
-            
-            # Si no se encontró por ID, buscar por posición (campo después de "Código SNIP")
-            if not cui_ingresado:
-                # Buscar el texto "Código Unico de Inversion" y luego el siguiente input
-                cui_inputs_alt = await page.query_selector_all('input[type="text"]')
-                # El campo CUI suele ser el penúltimo campo de texto antes del botón buscar
-                for i, input_elem in enumerate(cui_inputs_alt):
-                    value = await input_elem.input_value()
-                    if value == '' or value is None:
-                        # Intentar ingresar en campos vacíos cerca del final
-                        try:
-                            await input_elem.type(cui, timeout=5000)
-                            cui_ingresado = True
-                            logger.info(f"CUI ingresado en campo alternativo: {cui}")
-                            break
-                        except:
-                            continue
-            
-            if not cui_ingresado:
-                raise ExtractionException("No se pudo encontrar el campo de CUI")
+            # Seleccionar el año - PrimeFaces dropdown (click to open, then select)
+            year_dropdown_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
+            await page.click(f'#{year_dropdown_id}')
+            logger.info("Dropdown de año abierto")
+
+            # Esperar a que aparezca el panel del dropdown y hacer clic en la opción
+            await page.wait_for_timeout(500)  # Esperar animación
+            await page.click(f'#{year_dropdown_id}_panel li:has-text("{anio}")')
+            logger.info(f"Año seleccionado: {anio}")
+
+            # Ingresar el CUI usando el ID exacto del campo
+            cui_input_id = 'tbBuscador\\:idFormBuscarProceso\\:CUI'
+            await page.fill(f'#{cui_input_id}', cui)
+            logger.info(f"CUI ingresado: {cui}")
             
             # Hacer clic en el botón "Buscar"
             # Esperar a que el botón esté visible y habilitado
