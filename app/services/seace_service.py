@@ -161,18 +161,19 @@ class SEACEService:
             except Exception as e:
                 logger.warning(f"Timeout esperando networkidle: {str(e)}, continuando...")
 
-            # Esperar a que aparezcan los resultados - esperar por texto "Mostrando de"
-            logger.info("Esperando que aparezcan los resultados de búsqueda")
-            await page.wait_for_selector('text=Mostrando de', timeout=45000, state='visible')
-            logger.info("Tabla de resultados encontrada")
+            # Esperar a que aparezca el paginador específico de la tabla de resultados de búsqueda
+            logger.info("Esperando que aparezca el paginador de resultados")
+            paginator_selector = '#tbBuscador\\:idFormBuscarProceso\\:pnlGrdResultadosProcesos .ui-paginator-current'
+            await page.wait_for_selector(paginator_selector, timeout=45000, state='visible')
+            logger.info("Paginador encontrado")
 
             # Esperar tiempo adicional para que SEACE termine de procesar la búsqueda
             # SEACE puede mostrar "0 a 0" inicialmente y luego actualizar a los resultados reales
-            await page.wait_for_timeout(3000)
-            logger.info("Esperando finalización de procesamiento SEACE")
+            await page.wait_for_timeout(5000)
+            logger.info("Esperando finalización de procesamiento SEACE (5 segundos)")
 
             # Verificar que haya resultados (no "0 a 0 del total 0")
-            paginator = await page.query_selector('.ui-paginator-current')
+            paginator = await page.query_selector(paginator_selector)
             if paginator:
                 paginator_text = await paginator.inner_text()
                 logger.info(f"Paginador: {paginator_text}")
