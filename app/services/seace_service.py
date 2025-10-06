@@ -148,7 +148,7 @@ class SEACEService:
             await page.wait_for_timeout(500)
 
             # Hacer clic en el botón Buscar
-            buscar_button = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSel', timeout=90000, state='visible')
+            buscar_button = await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSelToken', timeout=90000, state='visible')
             await buscar_button.click()
             logger.info("Botón Buscar clickeado")
 
