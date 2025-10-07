@@ -30,31 +30,38 @@ async def scrape_mef_invierte(cui: str):
             - datos_ejecucion: Datos de la fase de ejecución
             - modificaciones: Lista de modificaciones durante la ejecución
     """
+    print(f"[MEF] Iniciando scraping MEF Invierte para CUI: {cui}", flush=True)
     logger.info(f"Iniciando scraping MEF Invierte para CUI: {cui}")
 
     async with async_playwright() as p:
+        print("[MEF] Iniciando Playwright...", flush=True)
         # Configurar browser
         browser = await p.chromium.launch(
             headless=True,
             args=['--no-sandbox', '--disable-setuid-sandbox']
         )
+        print("[MEF] Browser lanzado", flush=True)
 
         try:
             context = await browser.new_context(
                 viewport={'width': 1920, 'height': 1080}
             )
             page = await context.new_page()
+            print("[MEF] Página creada", flush=True)
 
             # 1. NAVEGAR A LA PÁGINA DE CONSULTA
+            print("[MEF] 1. Navegando a página de consulta MEF Invierte...", flush=True)
             logger.info("1. Navegando a página de consulta MEF Invierte...")
             await page.goto(
                 'https://ofi5.mef.gob.pe/invierte/consultapublica/consultainversiones',
                 wait_until='networkidle',
                 timeout=120000
             )
+            print("[MEF] Página cargada exitosamente", flush=True)
             await page.wait_for_timeout(2000)
 
             # 2. EXTRAER TEXTO DEL CAPTCHA
+            print("[MEF] 2. Extrayendo texto del captcha...", flush=True)
             logger.info("2. Extrayendo texto del captcha...")
             captcha_selector = 'img[alt="captcha"]'
 
