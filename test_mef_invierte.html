@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test MEF Invierte - Consulta por CUI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #e0e0e0;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.active {
+            display: block;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result h3 {
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .result-data {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .result-item {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 600;
+            min-width: 180px;
+            color: #555;
+        }
+
+        .result-value {
+            color: #333;
+            word-break: break-word;
+        }
+
+        .api-url {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 20px;
+            word-break: break-all;
+        }
+
+        .example-cuis {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .example-cuis h3 {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .cui-chip {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            margin: 5px 5px 5px 0;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .cui-chip:hover {
+            background: #764ba2;
+            transform: scale(1.05);
+        }
+
+        .timer {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏗️ Consulta MEF Invierte</h1>
+        <p class="subtitle">Banco de Inversiones - Ministerio de Economía y Finanzas</p>
+
+        <div class="api-url">
+            <strong>API Endpoint:</strong> http://localhost:8000/api/v1/mef-invierte/consultar
+        </div>
+
+        <div class="example-cuis">
+            <h3>📌 CUIs de ejemplo (click para usar):</h3>
+            <span class="cui-chip" onclick="useCUI('2595080')">2595080</span>
+            <span class="cui-chip" onclick="useCUI('2485678')">2485678</span>
+            <span class="cui-chip" onclick="useCUI('2396547')">2396547</span>
+        </div>
+
+        <form id="mefForm">
+            <div class="form-group">
+                <label for="cui">Código Único de Inversiones (CUI)</label>
+                <input
+                    type="text"
+                    id="cui"
+                    placeholder="Ejemplo: 2595080"
+                    required
+                    pattern="[0-9]+"
+                    title="Solo números"
+                >
+            </div>
+
+            <div class="button-group">
+                <button type="submit" class="btn-primary" id="submitBtn">
+                    🔍 Consultar
+                </button>
+                <button type="button" class="btn-secondary" onclick="clearResults()">
+                    🗑️ Limpiar
+                </button>
+            </div>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Consultando MEF Invierte...</p>
+            <p class="timer" id="timer"></p>
+        </div>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000/api/v1/mef-invierte/consultar';
+        let startTime;
+        let timerInterval;
+
+        function useCUI(cui) {
+            document.getElementById('cui').value = cui;
+            document.getElementById('cui').focus();
+        }
+
+        function clearResults() {
+            document.getElementById('result').classList.remove('active');
+            document.getElementById('cui').value = '';
+            document.getElementById('cui').focus();
+        }
+
+        function formatCurrency(value) {
+            if (value === null || value === undefined) return 'N/A';
+            return new Intl.NumberFormat('es-PE', {
+                style: 'currency',
+                currency: 'PEN'
+            }).format(value);
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                document.getElementById('timer').textContent = `⏱️ ${elapsed}s`;
+            }, 100);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+            return elapsed;
+        }
+
+        document.getElementById('mefForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const cui = document.getElementById('cui').value.trim();
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingDiv = document.getElementById('loading');
+            const resultDiv = document.getElementById('result');
+
+            // Limpiar resultados anteriores
+            resultDiv.classList.remove('active', 'success', 'error');
+            resultDiv.innerHTML = '';
+
+            // Mostrar loading
+            submitBtn.disabled = true;
+            loadingDiv.classList.add('active');
+            startTimer();
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ cui: cui })
+                });
+
+                const elapsed = stopTimer();
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Éxito - Mostrar TODA la información
+                    const d = data.data;
+                    resultDiv.className = 'result active success';
+
+                    let html = `<h3>✅ Inversión encontrada (${elapsed}s)</h3>`;
+
+                    // DATOS BÁSICOS
+                    html += `<div class="result-data"><h4 style="margin: 15px 0 10px 0; color: #667eea;">📋 DATOS BÁSICOS</h4>`;
+                    html += `<div class="result-item"><span class="result-label">CUI:</span><span class="result-value"><strong>${d.cui || 'N/A'}</strong></span></div>`;
+                    html += `<div class="result-item"><span class="result-label">Nombre:</span><span class="result-value">${d.nombre || 'N/A'}</span></div>`;
+                    html += `<div class="result-item"><span class="result-label">Estado:</span><span class="result-value">${d.estado || 'N/A'}</span></div>`;
+                    html += `<div class="result-item"><span class="result-label">Etapa:</span><span class="result-value">${d.etapa || 'N/A'}</span></div>`;
+                    html += `<div class="result-item"><span class="result-label">Fecha Registro:</span><span class="result-value">${d.fecha_registro || 'N/A'}</span></div>`;
+
+                    // ARTICULACIÓN PMI
+                    if (d.articulacion_pmi) {
+                        html += `<h4 style="margin: 15px 0 10px 0; color: #667eea;">🎯 ARTICULACIÓN PMI</h4>`;
+                        html += `<div class="result-item"><span class="result-label">Servicio Público:</span><span class="result-value">${d.articulacion_pmi.servicio_publico || 'N/A'}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Indicador Brecha:</span><span class="result-value">${d.articulacion_pmi.indicador_brecha || 'N/A'}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Espacio Geográfico:</span><span class="result-value">${d.articulacion_pmi.espacio_geografico || 'N/A'}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Contribución Brecha:</span><span class="result-value">${d.articulacion_pmi.contribucion_brecha || 'N/A'} personas</span></div>`;
+                    }
+
+                    // INSTITUCIONALIDAD
+                    if (d.institucionalidad) {
+                        html += `<h4 style="margin: 15px 0 10px 0; color: #667eea;">🏛️ INSTITUCIONALIDAD</h4>`;
+                        if (d.institucionalidad.uep) {
+                            html += `<div class="result-item"><span class="result-label">UEP:</span><span class="result-value">${d.institucionalidad.uep.codigo || 'N/A'}</span></div>`;
+                        }
+                        if (d.institucionalidad.uei && d.institucionalidad.uei.codigo) {
+                            html += `<div class="result-item"><span class="result-label">UEI:</span><span class="result-value">${d.institucionalidad.uei.codigo} - ${d.institucionalidad.uei.responsable || ''}</span></div>`;
+                        }
+                        if (d.institucionalidad.uf && d.institucionalidad.uf.codigo) {
+                            html += `<div class="result-item"><span class="result-label">UF:</span><span class="result-value">${d.institucionalidad.uf.codigo} - ${d.institucionalidad.uf.responsable || ''}</span></div>`;
+                        }
+                    }
+
+                    // EXPEDIENTE TÉCNICO
+                    if (d.expediente_tecnico) {
+                        html += `<h4 style="margin: 15px 0 10px 0; color: #667eea;">📄 EXPEDIENTE TÉCNICO</h4>`;
+
+                        // Metas
+                        if (d.expediente_tecnico.metas && d.expediente_tecnico.metas.length > 0) {
+                            html += `<div class="result-item"><span class="result-label">Metas:</span><span class="result-value">`;
+                            d.expediente_tecnico.metas.forEach(meta => {
+                                html += `<div style="margin: 5px 0;">• ${meta.tipo} - ${meta.activo}: ${meta.cantidad} ${meta.unidad}</div>`;
+                            });
+                            html += `</span></div>`;
+                        }
+
+                        html += `<div class="result-item"><span class="result-label">Modalidad:</span><span class="result-value">${d.expediente_tecnico.modalidad_ejecucion || 'N/A'}</span></div>`;
+
+                        // FECHAS DETALLADAS POR COMPONENTE
+                        html += `<h5 style="margin: 10px 0 5px 0; color: #764ba2; font-size: 14px;">📅 Cronograma por Componente (Expediente Original)</h5>`;
+
+                        if (d.expediente_tecnico.fechas_muro) {
+                            html += `<div class="result-item"><span class="result-label">🔹 Muro de Contención:</span><span class="result-value">Inicio: ${d.expediente_tecnico.fechas_muro.inicio}, Término: ${d.expediente_tecnico.fechas_muro.termino}, Entrega: ${d.expediente_tecnico.fechas_muro.entrega}</span></div>`;
+                        }
+
+                        if (d.expediente_tecnico.fechas_ptar) {
+                            html += `<div class="result-item"><span class="result-label">🔹 PTAR:</span><span class="result-value">Inicio: ${d.expediente_tecnico.fechas_ptar.inicio}, Término: ${d.expediente_tecnico.fechas_ptar.termino}, Entrega: ${d.expediente_tecnico.fechas_ptar.entrega}</span></div>`;
+                        }
+
+                        if (d.expediente_tecnico.fechas_expediente) {
+                            html += `<div class="result-item"><span class="result-label">🔹 Expediente Técnico:</span><span class="result-value">Inicio: ${d.expediente_tecnico.fechas_expediente.inicio}, Término: ${d.expediente_tecnico.fechas_expediente.termino}</span></div>`;
+                        }
+
+                        if (d.expediente_tecnico.fechas_supervision) {
+                            html += `<div class="result-item"><span class="result-label">🔹 Supervisión:</span><span class="result-value">Inicio: ${d.expediente_tecnico.fechas_supervision.inicio}, Término: ${d.expediente_tecnico.fechas_supervision.termino}</span></div>`;
+                        }
+
+                        if (d.expediente_tecnico.fechas_liquidacion) {
+                            html += `<div class="result-item"><span class="result-label">🔹 Liquidación:</span><span class="result-value">Inicio: ${d.expediente_tecnico.fechas_liquidacion.inicio}, Término: ${d.expediente_tecnico.fechas_liquidacion.termino}</span></div>`;
+                        }
+
+                        html += `<h5 style="margin: 10px 0 5px 0; color: #764ba2; font-size: 14px;">💵 Costos</h5>`;
+                        html += `<div class="result-item"><span class="result-label">Subtotal Metas:</span><span class="result-value">${formatCurrency(d.expediente_tecnico.subtotal_metas)}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Expediente Técnico:</span><span class="result-value">${formatCurrency(d.expediente_tecnico.costo_expediente_tecnico)}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Supervisión:</span><span class="result-value">${formatCurrency(d.expediente_tecnico.costo_supervision)}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Liquidación:</span><span class="result-value">${formatCurrency(d.expediente_tecnico.costo_liquidacion)}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Inversión Actualizado:</span><span class="result-value"><strong>${formatCurrency(d.expediente_tecnico.costo_inversion_actualizado)}</strong></span></div>`;
+                    }
+
+                    // MODIFICACIONES
+                    if (d.modificaciones_ejecucion) {
+                        html += `<h4 style="margin: 15px 0 10px 0; color: #667eea;">📝 MODIFICACIONES DURANTE EJECUCIÓN</h4>`;
+
+                        // Documentos
+                        if (d.modificaciones_ejecucion.documentos && d.modificaciones_ejecucion.documentos.length > 0) {
+                            html += `<div class="result-item"><span class="result-label">Documentos:</span><span class="result-value">`;
+                            d.modificaciones_ejecucion.documentos.forEach(doc => {
+                                html += `<div style="margin: 5px 0;">• ${doc.tipo}: ${doc.numero} ${doc.fecha ? '(' + doc.fecha + ')' : ''}</div>`;
+                            });
+                            html += `</span></div>`;
+                        }
+
+                        // FECHAS MODIFICADAS POR COMPONENTE
+                        html += `<h5 style="margin: 10px 0 5px 0; color: #764ba2; font-size: 14px;">📅 Cronograma Modificado por Componente</h5>`;
+
+                        if (d.modificaciones_ejecucion.fechas_muro_modificado) {
+                            html += `<div class="result-item"><span class="result-label">🔹 Muro de Contención:</span><span class="result-value">Inicio: ${d.modificaciones_ejecucion.fechas_muro_modificado.inicio}, Término Vigente: ${d.modificaciones_ejecucion.fechas_muro_modificado.termino_vigente}, Entrega: ${d.modificaciones_ejecucion.fechas_muro_modificado.entrega}</span></div>`;
+                        }
+
+                        if (d.modificaciones_ejecucion.fechas_ptar_modificado) {
+                            html += `<div class="result-item"><span class="result-label">🔹 PTAR:</span><span class="result-value">Inicio: ${d.modificaciones_ejecucion.fechas_ptar_modificado.inicio}, Término Vigente: ${d.modificaciones_ejecucion.fechas_ptar_modificado.termino_vigente}, Entrega: ${d.modificaciones_ejecucion.fechas_ptar_modificado.entrega}</span></div>`;
+                        }
+
+                        if (d.modificaciones_ejecucion.fechas_supervision_modificado) {
+                            html += `<div class="result-item"><span class="result-label">🔹 Supervisión:</span><span class="result-value">Inicio: ${d.modificaciones_ejecucion.fechas_supervision_modificado.inicio}, Término Vigente: ${d.modificaciones_ejecucion.fechas_supervision_modificado.termino_vigente}</span></div>`;
+                        }
+
+                        if (d.modificaciones_ejecucion.fechas_liquidacion_modificado) {
+                            html += `<div class="result-item"><span class="result-label">🔹 Liquidación:</span><span class="result-value">Inicio: ${d.modificaciones_ejecucion.fechas_liquidacion_modificado.inicio}, Término Vigente: ${d.modificaciones_ejecucion.fechas_liquidacion_modificado.termino_vigente}</span></div>`;
+                        }
+
+                        html += `<h5 style="margin: 10px 0 5px 0; color: #764ba2; font-size: 14px;">💵 Costos Modificados</h5>`;
+                        html += `<div class="result-item"><span class="result-label">Supervisión Modificado:</span><span class="result-value">${formatCurrency(d.modificaciones_ejecucion.costo_supervision_modificado)}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Inversión Modificado:</span><span class="result-value"><strong>${formatCurrency(d.modificaciones_ejecucion.costo_inversion_modificado)}</strong></span></div>`;
+                    }
+
+                    // COSTOS FINALES
+                    if (d.costos_finales) {
+                        html += `<h4 style="margin: 15px 0 10px 0; color: #667eea;">💰 COSTOS FINALES</h4>`;
+                        html += `<div class="result-item"><span class="result-label">Costo Total Actualizado:</span><span class="result-value"><strong style="font-size: 18px; color: #667eea;">${formatCurrency(d.costos_finales.costo_total_actualizado)}</strong></span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Control Concurrente:</span><span class="result-value">${formatCurrency(d.costos_finales.costo_control_concurrente)}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Controversias:</span><span class="result-value">${formatCurrency(d.costos_finales.costo_controversias)}</span></div>`;
+                        html += `<div class="result-item"><span class="result-label">Carta Fianza:</span><span class="result-value">${formatCurrency(d.costos_finales.monto_carta_fianza)}</span></div>`;
+                    }
+
+                    html += `<div class="result-item" style="margin-top: 15px; border-top: 2px solid #667eea; padding-top: 10px;"><span class="result-label">Fuente:</span><span class="result-value"><strong>${d.fuente || 'MEF Invierte'}</strong></span></div>`;
+                    html += `</div>`;
+
+                    resultDiv.innerHTML = html;
+                } else {
+                    // Error
+                    resultDiv.className = 'result active error';
+                    resultDiv.innerHTML = `
+                        <h3>❌ Error en la consulta (${elapsed}s)</h3>
+                        <div class="result-data">
+                            <p><strong>Mensaje:</strong> ${data.detail?.message || data.error || 'Error desconocido'}</p>
+                            <p><strong>CUI consultado:</strong> ${cui}</p>
+                            ${data.detail?.details ? `<p><strong>Detalles:</strong> ${data.detail.details}</p>` : ''}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                const elapsed = stopTimer();
+                resultDiv.className = 'result active error';
+                resultDiv.innerHTML = `
+                    <h3>❌ Error de conexión (${elapsed}s)</h3>
+                    <div class="result-data">
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p><strong>Posible causa:</strong> El servidor backend no está ejecutándose en http://localhost:8000</p>
+                        <p><strong>Solución:</strong> Ejecuta <code>uvicorn main:app --reload --port 8000</code> en la carpeta del backend</p>
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+                loadingDiv.classList.remove('active');
+            }
+        });
+
+        // Auto-focus en el input al cargar
+        document.getElementById('cui').focus();
+    </script>
+</body>
+</html>
