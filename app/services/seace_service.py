@@ -126,39 +126,44 @@ class SEACEService:
         logger.info(f"Ejecutando búsqueda para CUI: {cui}, Año: {anio}")
 
         try:
-            # Llenar el campo CUI (ya está visible del paso anterior)
+            # 1. LLENAR EL CAMPO CUI
             cui_input = await page.query_selector('#tbBuscador\\:idFormBuscarProceso\\:CUI')
             await cui_input.fill(cui)
             logger.info(f"CUI {cui} ingresado")
 
-            # Cambiar el año usando JavaScript directo (más confiable en headless)
+            # Verificar que el CUI se llenó correctamente
+            cui_value = await page.evaluate('''
+                document.querySelector('#tbBuscador\\\\:idFormBuscarProceso\\\\:CUI').value
+            ''')
+            logger.info(f"Verificación CUI en formulario: {cui_value}")
+
+            # 2. SELECCIONAR EL AÑO
             year_dropdown_id = 'tbBuscador:idFormBuscarProceso:anioConvocatoria'
-            # Escapar los dos puntos para el selector CSS
             year_dropdown_id_escaped = year_dropdown_id.replace(":", "\\\\:")
 
-            # Usar JavaScript para cambiar el año directamente
+            # Abrir el dropdown de año
             await page.evaluate(f'''
                 (() => {{
-                    // Abrir el dropdown
                     const dropdown = document.querySelector('#{year_dropdown_id_escaped}');
                     if (dropdown) {{
                         dropdown.click();
+                        return true;
                     }}
+                    return false;
                 }})()
             ''')
-            await page.wait_for_timeout(1000)
+            await page.wait_for_timeout(1500)
             logger.info("Dropdown de año abierto")
 
             # Seleccionar el año específico
-            await page.evaluate(f'''
+            year_selected = await page.evaluate(f'''
                 (() => {{
-                    // Buscar el panel del dropdown
                     const panel = document.querySelector('#{year_dropdown_id_escaped}_panel');
                     if (panel) {{
-                        // Buscar la opción con el año específico
                         const options = panel.querySelectorAll('li');
                         for (let option of options) {{
-                            if (option.getAttribute('data-label') === '{anio}' || option.textContent.trim() === '{anio}') {{
+                            if (option.getAttribute('data-label') === '{anio}' ||
+                                option.textContent.trim() === '{anio}') {{
                                 option.click();
                                 return true;
                             }}
@@ -167,9 +172,92 @@ class SEACEService:
                     return false;
                 }})()
             ''')
-            logger.info(f"Año {anio} seleccionado")
 
-            # Esperar a que se procese el cambio
+            if year_selected:
+                logger.info(f"Año {anio} seleccionado correctamente")
+            else:
+                logger.warning(f"No se pudo seleccionar el año {anio}")
+
+            await page.wait_for_timeout(1500)
+
+            # Verificar que el año se seleccionó
+            year_value = await page.evaluate(f'''
+                document.querySelector('#{year_dropdown_id_escaped}_label')?.textContent || "NO ENCONTRADO"
+            ''')
+            logger.info(f"Verificación año en formulario: {year_value}")
+
+            # 3. VERIFICAR Y SELECCIONAR VERSION SEACE 3
+            version_dropdown_id = 'tbBuscador:idFormBuscarProceso:ddlVersionSeace'
+            version_dropdown_id_escaped = version_dropdown_id.replace(":", "\\\\:")
+
+            # Verificar versión actual
+            current_version = await page.evaluate(f'''
+                document.querySelector('#{version_dropdown_id_escaped}_label')?.textContent || "NO ENCONTRADO"
+            ''')
+            logger.info(f"Versión SEACE actual: {current_version}")
+
+            # Si no es SEACE 3, cambiarla
+            if "Seace 3" not in current_version and "SEACE 3" not in current_version:
+                logger.info("Cambiando a SEACE 3...")
+
+                # Abrir dropdown de versión
+                await page.evaluate(f'''
+                    (() => {{
+                        const dropdown = document.querySelector('#{version_dropdown_id_escaped}');
+                        if (dropdown) {{
+                            dropdown.click();
+                            return true;
+                        }}
+                        return false;
+                    }})()
+                ''')
+                await page.wait_for_timeout(1000)
+
+                # Seleccionar SEACE 3
+                version_selected = await page.evaluate(f'''
+                    (() => {{
+                        const panel = document.querySelector('#{version_dropdown_id_escaped}_panel');
+                        if (panel) {{
+                            const options = panel.querySelectorAll('li');
+                            for (let option of options) {{
+                                const text = option.textContent.trim().toLowerCase();
+                                if (text.includes('seace 3') || text === 'seace 3') {{
+                                    option.click();
+                                    return true;
+                                }}
+                            }}
+                        }}
+                        return false;
+                    }})()
+                ''')
+
+                if version_selected:
+                    logger.info("SEACE 3 seleccionado correctamente")
+                else:
+                    logger.warning("No se pudo seleccionar SEACE 3")
+
+                await page.wait_for_timeout(1000)
+            else:
+                logger.info("Ya está seleccionado SEACE 3")
+
+            # 4. VERIFICACIÓN FINAL ANTES DE BUSCAR
+            logger.info("=== VERIFICACIÓN FINAL DE CAMPOS ===")
+
+            final_cui = await page.evaluate('''
+                document.querySelector('#tbBuscador\\\\:idFormBuscarProceso\\\\:CUI').value
+            ''')
+            final_year = await page.evaluate(f'''
+                document.querySelector('#{year_dropdown_id_escaped}_label')?.textContent || "NO"
+            ''')
+            final_version = await page.evaluate(f'''
+                document.querySelector('#{version_dropdown_id_escaped}_label')?.textContent || "NO"
+            ''')
+
+            logger.info(f"CUI final: {final_cui}")
+            logger.info(f"Año final: {final_year}")
+            logger.info(f"Versión final: {final_version}")
+
+            # Esperar un poco más para asegurar que todo esté listo
             await page.wait_for_timeout(2000)
 
             # Hacer clic en el botón Buscar
