@@ -54,8 +54,8 @@ async def scrape_mef_invierte(cui: str):
             logger.info("1. Navegando a página de consulta MEF Invierte...")
             await page.goto(
                 'https://ofi5.mef.gob.pe/invierte/consultapublica/consultainversiones',
-                wait_until='networkidle',
-                timeout=120000
+                wait_until='domcontentloaded',
+                timeout=60000
             )
             print("[MEF] Página cargada exitosamente", flush=True)
             await page.wait_for_timeout(2000)
