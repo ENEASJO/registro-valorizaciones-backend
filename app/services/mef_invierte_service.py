@@ -57,7 +57,7 @@ async def consultar_cui_mef(cui: str, timeout: int = 120000) -> Dict[str, Any]:
             logger.info(f"Navegando a MEF Invierte para CUI: {cui}")
             await page.goto(
                 'https://ofi5.mef.gob.pe/invierte/consultapublica/consultainversiones',
-                wait_until='networkidle',
+                wait_until='domcontentloaded',
                 timeout=timeout
             )
 
@@ -197,7 +197,7 @@ async def consultar_cui_mef_con_nombre(
             logger.info(f"Navegando a MEF Invierte - CUI: {cui}, Nombre: {nombre}")
             await page.goto(
                 'https://ofi5.mef.gob.pe/invierte/consultapublica/consultainversiones',
-                wait_until='networkidle',
+                wait_until='domcontentloaded',
                 timeout=timeout
             )
 
