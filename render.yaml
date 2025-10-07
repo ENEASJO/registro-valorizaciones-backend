@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: registro-valorizaciones-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile_playwright
+    plan: free
+    region: oregon
+    branch: main
+    healthCheckPath: /health
+    healthCheckTimeout: 300
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: BROWSER_HEADLESS
+        value: true
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /app/.cache/ms-playwright
+      - key: NEON_CONNECTION_STRING
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: HOST
+        value: 0.0.0.0
