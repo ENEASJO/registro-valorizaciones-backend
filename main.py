@@ -7,10 +7,19 @@ import os
 import random
 from datetime import datetime
 from typing import Dict, Any
+import logging
+import sys
+
+# Configurar logging básico para que todos los loggers envíen a stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:%(name)s:%(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 # NO importar Playwright al inicio - solo cuando se necesite
 app = FastAPI(
-    title="API de Valorizaciones - Inicio Rápido", 
+    title="API de Valorizaciones - Inicio Rápido",
     description="Backend con Playwright lazy loading para inicio rápido",
     version="4.2.1"
 )
