@@ -50,7 +50,7 @@ async def scrape_mef_invierte(cui: str):
             await page.goto(
                 'https://ofi5.mef.gob.pe/invierte/consultapublica/consultainversiones',
                 wait_until='networkidle',
-                timeout=60000
+                timeout=120000
             )
             await page.wait_for_timeout(2000)
 
@@ -100,7 +100,7 @@ async def scrape_mef_invierte(cui: str):
             ficha_icon_selector = 'a[title*="Ficha de ejecución"], a[href*="traeListaEjecucionSimplePublica"]'
 
             # Esperar a que el icono esté disponible
-            await page.wait_for_selector(ficha_icon_selector, timeout=10000)
+            await page.wait_for_selector(ficha_icon_selector, timeout=30000)
             await page.click(ficha_icon_selector)
             await page.wait_for_timeout(3000)
 
@@ -112,7 +112,7 @@ async def scrape_mef_invierte(cui: str):
             # 8. HACER CLIC EN EL ICONO DEL PDF (primer link en la columna Ver)
             logger.info("8. Navegando a ficha detallada (Formato N°08-C)...")
             pdf_icon_selector = 'a[href*="verFichaEjecucion"]'
-            await page.wait_for_selector(pdf_icon_selector, timeout=10000)
+            await page.wait_for_selector(pdf_icon_selector, timeout=30000)
             await page.click(pdf_icon_selector)
             await page.wait_for_timeout(3000)
 
@@ -208,7 +208,7 @@ async def _extract_resultado_table(page: Page) -> dict:
     """
     try:
         # Esperar a que aparezca la tabla de resultados
-        await page.wait_for_selector('table', timeout=10000)
+        await page.wait_for_selector('table', timeout=30000)
 
         # Extraer datos usando evaluate
         datos = await page.evaluate('''() => {
@@ -248,9 +248,9 @@ async def _extract_ejecucion_lista(page: Page) -> dict:
     try:
         datos = await page.evaluate('''() => {
             // Datos generales
-            const cui = document.querySelector('body')?.innerText.match(/Código único de inversiones[\s\n]+(\d+)/)?.[1] || '';
-            const monto_inversion = document.querySelector('body')?.innerText.match(/Monto de la inversión[\s\n]+(S\/[\d,\.]+)/)?.[1] || '';
-            const monto_actualizado = document.querySelector('body')?.innerText.match(/Monto actualizado[\s\n]+(S\/[\d,\.]+)/)?.[1] || '';
+            const cui = document.querySelector('body')?.innerText.match(/Código único de inversiones[\\s\\n]+(\\d+)/)?.[1] || '';
+            const monto_inversion = document.querySelector('body')?.innerText.match(/Monto de la inversión[\\s\\n]+(S\\/[\\d,\\.]+)/)?.[1] || '';
+            const monto_actualizado = document.querySelector('body')?.innerText.match(/Monto actualizado[\\s\\n]+(S\\/[\\d,\\.]+)/)?.[1] || '';
 
             // Tabla de modificaciones
             const modificaciones = [];
@@ -312,15 +312,15 @@ async def _extract_formato_08c(page: Page) -> dict:
             // ENCABEZADO
             const encabezado = {
                 titulo: getText('h2'),
-                fecha_registro: document.body.innerText.match(/Fecha de registro ([\d\/\s:]+)/)?.[1] || '',
-                etapa: document.body.innerText.match(/ETAPA:[\s]+([^\n]+)/)?.[1] || '',
-                estado: document.body.innerText.match(/ESTADO:[\s]+([^\n]+)/)?.[1] || ''
+                fecha_registro: document.body.innerText.match(/Fecha de registro ([\\d\\/\\s:]+)/)?.[1] || '',
+                etapa: document.body.innerText.match(/ETAPA:[\\s]+([^\\n]+)/)?.[1] || '',
+                estado: document.body.innerText.match(/ESTADO:[\\s]+([^\\n]+)/)?.[1] || ''
             };
 
             // DATOS GENERALES
             const datos_generales = {
-                cui: document.body.innerText.match(/Código único de inversiones[\s\n]+(\d+)/)?.[1] || '',
-                nombre: document.body.innerText.match(/Nombre de la inversión[\s\n]+([^\n]+)/)?.[1] || ''
+                cui: document.body.innerText.match(/Código único de inversiones[\\s\\n]+(\\d+)/)?.[1] || '',
+                nombre: document.body.innerText.match(/Nombre de la inversión[\\s\\n]+([^\\n]+)/)?.[1] || ''
             };
 
             // A. DATOS DE LA FASE DE FORMULACIÓN Y EVALUACIÓN
@@ -342,22 +342,22 @@ async def _extract_formato_08c(page: Page) -> dict:
 
             // 2. Articulación con el PMI
             const pmi = {
-                servicio_publico: textContent.match(/SERVICIO DE ([^\n]+)/)?.[1] || '',
-                indicador_brechas: textContent.match(/PORCENTAJE DE ([^\n]+)/)?.[1] || '',
-                unidad_medida: textContent.match(/Unidad de medida[\s\n]+([^\n]+)/)?.[1] || '',
-                espacio_geografico: textContent.match(/Espacio geográfico[\s\n]+([^\n]+)/)?.[1] || '',
-                contribucion_cierre: textContent.match(/Contribución de cierre de brechas[\s\n]+(\d+)/)?.[1] || ''
+                servicio_publico: textContent.match(/SERVICIO DE ([^\\n]+)/)?.[1] || '',
+                indicador_brechas: textContent.match(/PORCENTAJE DE ([^\\n]+)/)?.[1] || '',
+                unidad_medida: textContent.match(/Unidad de medida[\\s\\n]+([^\\n]+)/)?.[1] || '',
+                espacio_geografico: textContent.match(/Espacio geográfico[\\s\\n]+([^\\n]+)/)?.[1] || '',
+                contribucion_cierre: textContent.match(/Contribución de cierre de brechas[\\s\\n]+(\\d+)/)?.[1] || ''
             };
 
             // 3. Institucionalidad
             const institucionalidad = {
                 opmi_aprobacion: '',
-                opmi_ejecucion: textContent.match(/OPMI DE LA ([^\n]+)/)?.[1] || '',
+                opmi_ejecucion: textContent.match(/OPMI DE LA ([^\\n]+)/)?.[1] || '',
                 uf_aprobacion: '',
-                uf_ejecucion: textContent.match(/UF DE LA ([^-\n]+)/)?.[1] || '',
+                uf_ejecucion: textContent.match(/UF DE LA ([^-\\n]+)/)?.[1] || '',
                 uei_aprobacion: '',
-                uei_ejecucion: textContent.match(/UEI DE LA ([^-\n]+)/)?.[1] || '',
-                uep: textContent.match(/UEP[\s\n]+([^\n]+)/)?.[1] || ''
+                uei_ejecucion: textContent.match(/UEI DE LA ([^-\\n]+)/)?.[1] || '',
+                uep: textContent.match(/UEP[\\s\\n]+([^\\n]+)/)?.[1] || ''
             };
 
             // B. DATOS EN LA FASE DE EJECUCIÓN
@@ -367,13 +367,13 @@ async def _extract_formato_08c(page: Page) -> dict:
 
             // 4.2 Programación de la ejecución
             const programacion_ejecucion = {
-                subtotal: textContent.match(/Subtotal:[\s]+S\/([\d,\.]+)/)?.[1] || '',
-                gastos_generales_covid: textContent.match(/GASTOS GENERALES COVID:[\s]+S\/([\d,\.]+)/)?.[1] || '',
-                inventario_fisico_covid: textContent.match(/INVENTARIO FISICO COVID:[\s]+S\/([\d,\.]+)/)?.[1] || '',
-                expediente_tecnico: textContent.match(/EXPEDIENTE TÉCNICO:[\s]+S\/([\d,\.]+)/)?.[1] || '',
-                supervision: textContent.match(/SUPERVISIÓN:[\s]+S\/([\d,\.]+)/)?.[1] || '',
-                liquidacion: textContent.match(/LIQUIDACIÓN:[\s]+S\/([\d,\.]+)/)?.[1] || '',
-                costo_inversion_actualizado: textContent.match(/Costo de inversión actualizado:[\s]+S\/([\d,\.]+)/)?.[1] || ''
+                subtotal: textContent.match(/Subtotal:[\\s]+S\\/([\\d,\\.]+)/)?.[1] || '',
+                gastos_generales_covid: textContent.match(/GASTOS GENERALES COVID:[\\s]+S\\/([\\d,\\.]+)/)?.[1] || '',
+                inventario_fisico_covid: textContent.match(/INVENTARIO FISICO COVID:[\\s]+S\\/([\\d,\\.]+)/)?.[1] || '',
+                expediente_tecnico: textContent.match(/EXPEDIENTE TÉCNICO:[\\s]+S\\/([\\d,\\.]+)/)?.[1] || '',
+                supervision: textContent.match(/SUPERVISIÓN:[\\s]+S\\/([\\d,\\.]+)/)?.[1] || '',
+                liquidacion: textContent.match(/LIQUIDACIÓN:[\\s]+S\\/([\\d,\\.]+)/)?.[1] || '',
+                costo_inversion_actualizado: textContent.match(/Costo de inversión actualizado:[\\s]+S\\/([\\d,\\.]+)/)?.[1] || ''
             };
 
             // 5. Modificaciones durante la ejecución física
@@ -381,11 +381,11 @@ async def _extract_formato_08c(page: Page) -> dict:
 
             // COSTOS FINALES
             const costos_finales = {
-                costo_inversion_actualizado: textContent.match(/Costo de inversión actualizado:[\s]+S\/([\d,\.]+)/g)?.pop()?.match(/([\d,\.]+)/)?.[1] || '',
-                costo_control_concurrente: textContent.match(/Costo de control concurrente \(CCC\):[\s]+S\/([\d,\.]+)/)?.[1] || '',
-                costo_controversias: textContent.match(/Costo de controversias:[\s]+S\/\.([\d,\.]+)/)?.[1] || '',
-                monto_carta_fianza: textContent.match(/Monto de carta fianza:[\s]+S\/\.([\d,\.]+)/)?.[1] || '',
-                costo_total_actualizado: textContent.match(/Costo total de inversión actualizado:[\s]+S\/\.?([\d,\.]+)/)?.[1] || ''
+                costo_inversion_actualizado: textContent.match(/Costo de inversión actualizado:[\\s]+S\\/([\\d,\\.]+)/g)?.pop()?.match(/([\\d,\\.]+)/)?.[1] || '',
+                costo_control_concurrente: textContent.match(/Costo de control concurrente \\(CCC\\):[\\s]+S\\/([\\d,\\.]+)/)?.[1] || '',
+                costo_controversias: textContent.match(/Costo de controversias:[\\s]+S\\/\\.([\\d,\\.]+)/)?.[1] || '',
+                monto_carta_fianza: textContent.match(/Monto de carta fianza:[\\s]+S\\/\\.([\\d,\\.]+)/)?.[1] || '',
+                costo_total_actualizado: textContent.match(/Costo total de inversión actualizado:[\\s]+S\\/\\.?([\\d,\\.]+)/)?.[1] || ''
             };
 
             return {
