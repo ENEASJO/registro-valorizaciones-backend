@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-async def consultar_cui_mef(cui: str, timeout: int = 45000) -> Dict[str, Any]:
+async def consultar_cui_mef(cui: str, timeout: int = 120000) -> Dict[str, Any]:
     """
     Consulta información de una inversión pública por su CUI en MEF Invierte
 
@@ -62,7 +62,7 @@ async def consultar_cui_mef(cui: str, timeout: int = 45000) -> Dict[str, Any]:
             )
 
             # Esperar a que cargue el formulario
-            await page.wait_for_selector('#divCaptcha', timeout=10000)
+            await page.wait_for_selector('#divCaptcha', timeout=20000)
 
             # Extraer el texto del CAPTCHA (es texto HTML simple, no imagen)
             captcha_text = await page.evaluate('''() => {
@@ -89,7 +89,7 @@ async def consultar_cui_mef(cui: str, timeout: int = 45000) -> Dict[str, Any]:
             # Esperar resultados (puede aparecer tabla o mensaje de "no hay resultados")
             try:
                 # Esperar a que aparezca la fila con los resultados
-                await page.wait_for_selector('table tbody tr td a', timeout=15000)
+                await page.wait_for_selector('table tbody tr td a', timeout=30000)
 
                 # Extraer datos de la tabla de resultados
                 resultado = await page.evaluate('''() => {
@@ -159,7 +159,7 @@ async def consultar_cui_mef(cui: str, timeout: int = 45000) -> Dict[str, Any]:
 async def consultar_cui_mef_con_nombre(
     cui: Optional[str] = None,
     nombre: Optional[str] = None,
-    timeout: int = 45000
+    timeout: int = 120000
 ) -> Dict[str, Any]:
     """
     Consulta inversión por CUI o nombre en MEF Invierte
@@ -201,7 +201,7 @@ async def consultar_cui_mef_con_nombre(
                 timeout=timeout
             )
 
-            await page.wait_for_selector('#divCaptcha', timeout=10000)
+            await page.wait_for_selector('#divCaptcha', timeout=20000)
 
             # Extraer CAPTCHA
             captcha_text = await page.evaluate('''() => {
@@ -231,7 +231,7 @@ async def consultar_cui_mef_con_nombre(
             await page.click('button:has-text("Buscar")')
 
             try:
-                await page.wait_for_selector('table tbody tr td', timeout=15000)
+                await page.wait_for_selector('table tbody tr td', timeout=30000)
 
                 # Extraer todos los resultados
                 resultados = await page.evaluate('''() => {
