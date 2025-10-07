@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-async def consultar_cui_mef(cui: str, timeout: int = 120000) -> Dict[str, Any]:
+async def consultar_cui_mef(cui: str, timeout: int = 300000) -> Dict[str, Any]:
     """
     Consulta información COMPLETA de una inversión pública desde la Ficha de Ejecución en MEF Invierte
 
@@ -27,10 +27,19 @@ async def consultar_cui_mef(cui: str, timeout: int = 120000) -> Dict[str, Any]:
 
     try:
         async with async_playwright() as p:
-            # Iniciar navegador
+            # Iniciar navegador con optimizaciones para recursos limitados (Render FREE tier)
             browser = await p.chromium.launch(
                 headless=True,
-                args=['--no-sandbox', '--disable-setuid-sandbox']
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',  # Evita problemas de memoria compartida
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',  # Reducir uso de memoria
+                    '--disable-gpu'
+                ]
             )
 
             context = await browser.new_context(
@@ -478,7 +487,7 @@ async def consultar_cui_mef(cui: str, timeout: int = 120000) -> Dict[str, Any]:
 async def consultar_cui_mef_con_nombre(
     cui: Optional[str] = None,
     nombre: Optional[str] = None,
-    timeout: int = 120000
+    timeout: int = 300000
 ) -> Dict[str, Any]:
     """
     Consulta inversión por CUI o nombre en MEF Invierte
@@ -501,9 +510,19 @@ async def consultar_cui_mef_con_nombre(
 
     try:
         async with async_playwright() as p:
+            # Usar mismas optimizaciones que en consultar_cui_mef
             browser = await p.chromium.launch(
                 headless=True,
-                args=['--no-sandbox', '--disable-setuid-sandbox']
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu'
+                ]
             )
 
             context = await browser.new_context(
