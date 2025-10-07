@@ -131,25 +131,44 @@ class SEACEService:
             await cui_input.fill(cui)
             logger.info(f"CUI {cui} ingresado")
 
-            # Cambiar el año - es un componente PrimeFaces, no un select nativo
-            # Hacer clic para abrir el dropdown
-            year_dropdown_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
-            year_dropdown_label = f'label[id="{year_dropdown_id}_label"]'
+            # Cambiar el año usando JavaScript directo (más confiable en headless)
+            year_dropdown_id = 'tbBuscador:idFormBuscarProceso:anioConvocatoria'
 
-            # Hacer clic en el label del dropdown para abrirlo
-            await page.click(year_dropdown_label)
+            # Usar JavaScript para cambiar el año directamente
+            await page.evaluate(f'''
+                (() => {{
+                    // Abrir el dropdown
+                    const dropdown = document.querySelector('#{year_dropdown_id.replace(":", "\\\\:")}');
+                    if (dropdown) {{
+                        dropdown.click();
+                    }}
+                }})()
+            ''')
+            await page.wait_for_timeout(1000)
             logger.info("Dropdown de año abierto")
 
-            # Esperar a que aparezcan las opciones del dropdown panel
-            await page.wait_for_selector(f'#{year_dropdown_id}_panel', state='visible', timeout=5000)
-
-            # Hacer clic en la opción del año usando el selector correcto
-            year_option_selector = f'#{year_dropdown_id}_panel li[data-label="{anio}"]'
-            await page.click(year_option_selector)
+            # Seleccionar el año específico
+            await page.evaluate(f'''
+                (() => {{
+                    // Buscar el panel del dropdown
+                    const panel = document.querySelector('#{year_dropdown_id.replace(":", "\\\\:")}_panel');
+                    if (panel) {{
+                        // Buscar la opción con el año específico
+                        const options = panel.querySelectorAll('li');
+                        for (let option of options) {{
+                            if (option.getAttribute('data-label') === '{anio}' || option.textContent.trim() === '{anio}') {{
+                                option.click();
+                                return true;
+                            }}
+                        }}
+                    }}
+                    return false;
+                }})()
+            ''')
             logger.info(f"Año {anio} seleccionado")
 
-            # Esperar un momento para que se procese el cambio
-            await page.wait_for_timeout(500)
+            # Esperar a que se procese el cambio
+            await page.wait_for_timeout(2000)
 
             # Hacer clic en el botón Buscar
             buscar_button = await page.query_selector('#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSelToken')
