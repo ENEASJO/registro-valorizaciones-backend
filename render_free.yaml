@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: registro-valorizaciones-backend-free
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: "pip install -r requirements.txt && python -m playwright install chromium && python -m playwright install-deps"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: BROWSER_HEADLESS
+        value: true
+      - key: NEON_CONNECTION_STRING
+        value: postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk-pooler.sa-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require
