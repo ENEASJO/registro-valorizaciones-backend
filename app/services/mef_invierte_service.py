@@ -61,12 +61,19 @@ async def scrape_mef_invierte(cui: str):
             # 1. NAVEGAR A LA PÁGINA DE CONSULTA
             print("[MEF] 1. Navegando a página de consulta MEF Invierte...", flush=True)
             logger.info("1. Navegando a página de consulta MEF Invierte...")
-            await page.goto(
-                'https://ofi5.mef.gob.pe/invierte/consultapublica/consultainversiones',
-                wait_until='load',
-                timeout=90000
-            )
-            print("[MEF] Página cargada exitosamente", flush=True)
+            try:
+                await page.goto(
+                    'https://ofi5.mef.gob.pe/invierte/consultapublica/consultainversiones',
+                    wait_until='commit',  # Solo esperar a que comience la navegación
+                    timeout=30000  # Timeout reducido para detectar problemas más rápido
+                )
+                print("[MEF] Navegación iniciada, esperando carga...", flush=True)
+                # Esperar a que se cargue el DOM
+                await page.wait_for_load_state('domcontentloaded', timeout=30000)
+                print("[MEF] Página cargada exitosamente", flush=True)
+            except Exception as nav_error:
+                print(f"[MEF] ERROR en navegación: {type(nav_error).__name__}: {str(nav_error)}", flush=True)
+                raise
             await page.wait_for_timeout(2000)
 
             # 2. EXTRAER TEXTO DEL CAPTCHA
