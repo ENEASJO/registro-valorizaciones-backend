@@ -133,12 +133,14 @@ class SEACEService:
 
             # Cambiar el año usando JavaScript directo (más confiable en headless)
             year_dropdown_id = 'tbBuscador:idFormBuscarProceso:anioConvocatoria'
+            # Escapar los dos puntos para el selector CSS
+            year_dropdown_id_escaped = year_dropdown_id.replace(":", "\\\\:")
 
             # Usar JavaScript para cambiar el año directamente
             await page.evaluate(f'''
                 (() => {{
                     // Abrir el dropdown
-                    const dropdown = document.querySelector('#{year_dropdown_id.replace(":", "\\\\:")}');
+                    const dropdown = document.querySelector('#{year_dropdown_id_escaped}');
                     if (dropdown) {{
                         dropdown.click();
                     }}
@@ -151,7 +153,7 @@ class SEACEService:
             await page.evaluate(f'''
                 (() => {{
                     // Buscar el panel del dropdown
-                    const panel = document.querySelector('#{year_dropdown_id.replace(":", "\\\\:")}_panel');
+                    const panel = document.querySelector('#{year_dropdown_id_escaped}_panel');
                     if (panel) {{
                         // Buscar la opción con el año específico
                         const options = panel.querySelectorAll('li');
