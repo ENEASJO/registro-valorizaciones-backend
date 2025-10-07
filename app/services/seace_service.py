@@ -1,355 +1,312 @@
 """
-Servicio para consultar información de obras en SEACE
+Servicio para consultas SEACE (Sistema Electrónico de Contrataciones del Estado)
 """
-from playwright.async_api import async_playwright, Page, TimeoutError as PlaywrightTimeoutError
-from typing import Optional
 import logging
+import re
+from typing import Optional
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError, Page
 
 from app.models.seace import ObraSEACE
-from app.utils.exceptions import ExtractionException
+from app.utils.exceptions import ValidationException, ExtractionException
+from app.utils.playwright_helper import get_browser_launch_options
 
 logger = logging.getLogger(__name__)
 
 
 class SEACEService:
-    """Servicio para extraer información de obras desde SEACE"""
-    
-    BASE_URL = "https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml"
-    
+    """Servicio para consultar datos de obras en SEACE"""
+
+    def __init__(self):
+        self.base_url = "https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml"
+        self.timeout = 120000  # 120 seconds (2 minutes) para permitir scraping completo
+
     async def consultar_obra(self, cui: str, anio: int) -> ObraSEACE:
         """
-        Consulta información completa de una obra en SEACE por CUI y año
-        
+        Consulta información completa de una obra en SEACE
+
         Args:
             cui: Código Único de Inversión
             anio: Año de la convocatoria
-            
+
         Returns:
-            ObraSEACE con toda la información extraída
-            
+            ObraSEACE: Información completa de la obra
+
         Raises:
-            ExtractionException: Si hay error en la extracción
+            ValidationException: Si los parámetros no son válidos
+            ExtractionException: Si hay errores en la extracción
         """
-        logger.info(f"Iniciando consulta SEACE para CUI: {cui}, Año: {anio}")
-        
+        logger.info(f"=== INICIANDO CONSULTA SEACE PARA CUI: {cui}, AÑO: {anio} ===")
+
+        # Validar CUI
+        if not self._validar_cui(cui):
+            logger.error(f"CUI inválido: {cui}")
+            raise ValidationException(f"CUI inválido: {cui}")
+
+        # Validar año
+        if not (2000 <= anio <= 2100):
+            logger.error(f"Año inválido: {anio}")
+            raise ValidationException(f"Año inválido: {anio}. Debe estar entre 2000 y 2100")
+
+        logger.info(f"CUI {cui} y año {anio} validados correctamente")
+
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-setuid-sandbox']
-            )
-            
+            launch_options = get_browser_launch_options(headless=True)
+            browser = await p.chromium.launch(**launch_options)
+
             try:
-                page = await browser.new_page()
-                page.set_default_timeout(30000)  # 30 segundos timeout por defecto
-                
+                context = await browser.new_context(
+                    viewport={'width': 1280, 'height': 720},
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
+
+                page = await context.new_page()
+
                 # Navegar a SEACE
-                await self._navegar_a_seace(page)
-                
-                # Ejecutar búsqueda
+                logger.info("Navegando a página principal de SEACE")
+                await page.goto(self.base_url, timeout=60000, wait_until='domcontentloaded')
+                logger.info("Página SEACE cargada")
+
+                # Hacer clic en la pestaña "Buscador de Procedimientos de Selección"
+                logger.info("Haciendo clic en pestaña de búsqueda de procedimientos")
+                await page.click('a:has-text("Buscador de Procedimientos de Selección")', timeout=20000)
+                logger.info("Pestaña clickeada")
+
+                # Esperar a que aparezca el formulario de búsqueda
+                logger.info("Esperando formulario de búsqueda")
+                await page.wait_for_selector('#tbBuscador\\:idFormBuscarProceso\\:CUI', timeout=60000, state='visible')
+                logger.info("Formulario disponible")
+
+                # Realizar búsqueda
                 await self._ejecutar_busqueda(page, cui, anio)
 
-                # Navegar al historial
-                await self._navegar_a_historial(page, cui)
+                # Navegar al historial de contratación
+                await self._navegar_a_historial(page)
 
                 # Navegar a la ficha de selección
                 await self._navegar_a_ficha_seleccion(page)
-                
-                # Extraer información de la ficha
-                obra_info = await self._extraer_informacion_ficha(page, cui, anio)
-                
-                logger.info(f"Consulta SEACE exitosa para CUI {cui}")
-                return obra_info
-                
+
+                # Extraer datos completos de la ficha de selección
+                logger.info(f"🚀 Iniciando extracción de datos completos para CUI: {cui}")
+                obra_data = await self._extraer_datos_completos(page, cui, anio)
+
+                # Navegar a "Ver integrantes y encargado" para extraer el número de contrato
+                await self._navegar_a_integrantes(page)
+                numero_contrato = await self._extraer_numero_contrato(page)
+
+                # Actualizar obra_data con el número de contrato si se extrajo
+                if numero_contrato:
+                    obra_data.numero_contrato = numero_contrato
+
+                logger.info(f"✅ Extracción de datos completos completada para CUI: {cui}")
+
+                logger.info(f"Consulta SEACE completada exitosamente para CUI: {cui}")
+                return obra_data
+
             except PlaywrightTimeoutError as e:
                 logger.error(f"Timeout en consulta SEACE para CUI {cui}: {str(e)}")
-                raise ExtractionException(f"Timeout consultando SEACE: {str(e)}")
+                raise ExtractionException(f"Timeout al consultar SEACE: {str(e)}")
+
             except Exception as e:
-                logger.error(f"Error consultando SEACE para CUI {cui}: {str(e)}")
+                logger.error(f"Error en consulta SEACE para CUI {cui}: {str(e)}")
                 raise ExtractionException(f"Error al consultar SEACE: {str(e)}")
+
             finally:
                 await browser.close()
-    
-    async def _navegar_a_seace(self, page: Page):
-        """Navega a la página principal de SEACE"""
-        logger.info(f"Navegando a SEACE: {self.BASE_URL}")
-        await page.goto(self.BASE_URL, wait_until='networkidle', timeout=60000)
 
-        # Esperar a que el tab activo cargue completamente
-        await page.wait_for_selector('.ui-tabs-selected.ui-state-active', timeout=30000, state='visible')
-        logger.info("Tab de búsqueda activo")
+    def _validar_cui(self, cui: str) -> bool:
+        """Valida el formato del CUI"""
+        if not cui or len(cui) < 7 or len(cui) > 10:
+            return False
+        if not cui.isdigit():
+            return False
+        return True
 
-        # Esperar tiempo adicional para que JavaScript inicialice el formulario
-        # En headless puede tomar más tiempo que en modo gráfico
-        await page.wait_for_timeout(8000)
-        logger.info("Esperando inicialización del formulario (8 segundos)")
-
-        # Verificar que el campo CUI exista (sin validar visibilidad estricta)
-        # Los dos puntos en IDs JSF deben escaparse en querySelector
-        cui_input_id = 'tbBuscador\\\\:idFormBuscarProceso\\\\:CUI'
-        await page.wait_for_function(
-            f'document.querySelector("#{cui_input_id}") !== null',
-            timeout=30000
-        )
-        logger.info("Campo CUI encontrado - Página SEACE cargada correctamente")
-
-        # Verificar qué valor tiene "Version SEACE" por defecto en headless
-        version_seace_value = await page.evaluate('''
-            (() => {
-                const versionDropdown = document.querySelector('#tbBuscador\\\\:idFormBuscarProceso\\\\:j_idt227_label');
-                return versionDropdown ? versionDropdown.textContent : "NO ENCONTRADO";
-            })()
-        ''')
-        logger.info(f"VERIFICACIÓN: Version SEACE por defecto en headless: {version_seace_value}")
-    
     async def _ejecutar_busqueda(self, page: Page, cui: str, anio: int):
-        """Ejecuta la búsqueda SOLO por año en SEACE (estrategia año-only como test_seace_node.js PRUEBA 2)"""
-        logger.info(f"ESTRATEGIA AÑO-ONLY: Buscando por año={anio}, luego paginar para CUI exacto {cui}")
+        """Ejecuta la búsqueda inicial en SEACE"""
+        logger.info(f"Ejecutando búsqueda para CUI: {cui}, Año: {anio}")
 
         try:
-            # Seleccionar año en dropdown (igual que test_seace_node.js PRUEBA 2)
-            year_dropdown_id = 'tbBuscador\\\\:idFormBuscarProceso\\\\:anioConvocatoria'
+            # Llenar el campo CUI (ya está visible del paso anterior)
+            cui_input = await page.query_selector('#tbBuscador\\:idFormBuscarProceso\\:CUI')
+            await cui_input.fill(cui)
+            logger.info(f"CUI {cui} ingresado")
 
-            # Click en dropdown para abrirlo
-            await page.evaluate(f'''
-                document.querySelector("#{year_dropdown_id}").click();
-            ''')
-            await page.wait_for_timeout(500)
-            logger.info(f"Dropdown de año abierto")
+            # Cambiar el año - es un componente PrimeFaces, no un select nativo
+            # Hacer clic para abrir el dropdown
+            year_dropdown_id = 'tbBuscador\\:idFormBuscarProceso\\:anioConvocatoria'
+            year_dropdown_label = f'label[id="{year_dropdown_id}_label"]'
 
-            # Seleccionar opción {anio} del panel
-            await page.evaluate(f'''
-                const panel = document.querySelector("#{year_dropdown_id}_panel");
-                if (panel) {{
-                    const option = Array.from(panel.querySelectorAll('li')).find(li => li.textContent.trim() === '{anio}');
-                    if (option) {{
-                        option.click();
-                    }}
-                }}
-            ''')
+            # Hacer clic en el label del dropdown para abrirlo
+            await page.click(year_dropdown_label)
+            logger.info("Dropdown de año abierto")
+
+            # Esperar a que aparezcan las opciones del dropdown panel
+            await page.wait_for_selector(f'#{year_dropdown_id}_panel', state='visible', timeout=5000)
+
+            # Hacer clic en la opción del año usando el selector correcto
+            year_option_selector = f'#{year_dropdown_id}_panel li[data-label="{anio}"]'
+            await page.click(year_option_selector)
             logger.info(f"Año {anio} seleccionado")
 
-            # Verificar que el valor quedó seleccionado
-            anio_value = await page.evaluate(f'''
-                document.querySelector("#{year_dropdown_id}_label")?.textContent || "NO ENCONTRADO"
-            ''')
-            logger.info(f"VERIFICACIÓN: Año en formulario: {anio_value}")
+            # Esperar un momento para que se procese el cambio
+            await page.wait_for_timeout(500)
 
-            # Hacer clic en el botón "Buscar" usando JavaScript (bypass visibility check)
-            await page.wait_for_timeout(2000)  # Esperar estabilización del formulario
-            button_clicked = await page.evaluate('''
-                (() => {
-                    const buscarButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Buscar'));
-                    if (buscarButton) {
-                        buscarButton.click();
-                        return true;
-                    }
-                    return false;
-                })()
-            ''')
-            if button_clicked:
-                logger.info("Clic en botón Buscar exitoso (JavaScript)")
-                await page.wait_for_timeout(8000)  # Esperar procesamiento inicial de SEACE
-            else:
-                raise ExtractionException("No se pudo hacer clic en el botón Buscar")
+            # Hacer clic en el botón Buscar
+            buscar_button = await page.query_selector('#tbBuscador\\:idFormBuscarProceso\\:btnBuscarSelToken')
+            await buscar_button.click()
+            logger.info("Botón Buscar clickeado")
 
-            # Esperar a que aparezca el paginador y que muestre resultados (no "0 a 0")
-            logger.info("Esperando que aparezca el paginador de resultados con datos")
+            # Esperar a que termine la actividad de red después del clic
+            logger.info("Esperando que termine la actividad de red")
             try:
-                await page.wait_for_function(
-                    '''
-                    (() => {
-                        const paginator = document.querySelector("#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current");
-                        if (!paginator) return false;
-                        const text = paginator.textContent.toLowerCase();
-                        return !text.includes('total 0') && !text.includes('0 a 0');
-                    })()
-                    ''',
-                    timeout=30000
-                )
-                logger.info("Paginador con resultados encontrado")
-            except PlaywrightTimeoutError:
-                # Si timeout, verificar el texto del paginador para dar mensaje específico
-                paginator_selector_css = '#tbBuscador\\:idFormBuscarProceso\\:pnlGrdResultadosProcesos .ui-paginator-current'
-                paginator = await page.query_selector(paginator_selector_css)
-                if paginator:
-                    paginator_text = await paginator.inner_text()
-                    logger.error(f"Timeout esperando resultados. Paginador: {paginator_text}")
-                    raise ExtractionException(f"No se encontraron resultados en SEACE para año={anio}.")
-                else:
-                    logger.error("Timeout: paginador no encontrado")
-                    raise ExtractionException("Timeout esperando paginador de resultados")
+                await page.wait_for_load_state('networkidle', timeout=45000)
+                logger.info("Actividad de red completada")
+            except Exception as e:
+                logger.warning(f"Timeout esperando networkidle: {str(e)}, continuando...")
 
-            # Confirmar que la columna "Acciones" existe (sin validar visibilidad)
-            await page.wait_for_function(
-                'document.evaluate("//text()[contains(., \'Acciones\')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue !== null',
-                timeout=10000
-            )
+            # Esperar a que aparezcan los resultados - esperar por texto "Mostrando de"
+            logger.info("Esperando que aparezcan los resultados de búsqueda")
+            await page.wait_for_selector('text=Mostrando de', timeout=45000, state='visible')
+            logger.info("Tabla de resultados encontrada")
 
-            # Obtener información del paginador para logs
-            paginator_info = await page.evaluate('''
-                (() => {
-                    const paginator = document.querySelector("#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-current");
-                    return paginator ? paginator.textContent : "No encontrado";
-                })()
-            ''')
-            logger.info(f"Resultados de búsqueda cargados. {paginator_info}. Se paginará para encontrar CUI exacto {cui}")
+            # Confirmar que la columna "Acciones" está visible
+            await page.wait_for_selector('span.ui-outputlabel:text-is("Acciones")', timeout=10000, state='visible')
+            logger.info("Resultados de búsqueda cargados completamente")
 
         except Exception as e:
             logger.error(f"Error ejecutando búsqueda: {str(e)}")
             raise ExtractionException(f"Error ejecutando búsqueda: {str(e)}")
-    
-    async def _navegar_a_historial(self, page: Page, cui: str):
-        """Navega al historial de contratación paginando hasta encontrar el CUI exacto"""
-        logger.info(f"Buscando CUI exacto {cui} con paginación automática")
+
+    async def _navegar_a_historial(self, page: Page):
+        """Navega al historial de contratación (primer ícono en Acciones)"""
+        logger.info("Navegando a historial de contratación")
 
         try:
-            max_paginas = 50  # Límite de seguridad
-            pagina_actual = 1
+            # Buscar la tabla de resultados
+            tabla_resultados = await page.wait_for_selector(
+                '#tbBuscador\\:idFormBuscarProceso\\:pnlGrdResultadosProcesos table tbody tr:last-child',
+                timeout=30000,
+                state='visible'
+            )
 
-            while pagina_actual <= max_paginas:
-                logger.info(f"Buscando en página {pagina_actual}...")
+            # Buscar el primer ícono (historial) en la columna de Acciones
+            historial_icon = await tabla_resultados.query_selector('td:last-child a.ui-commandlink:first-child')
 
-                # Buscar el CUI exacto en la página actual
-                historial_result = await page.evaluate(f'''
-                    (() => {{
-                        const rows = document.querySelectorAll('#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos table tbody tr');
-                        console.log(`Página {pagina_actual}: Total filas = ${{rows.length}}`);
+            if not historial_icon:
+                raise ExtractionException("No se encontró el ícono de historial")
 
-                        for (let i = 0; i < rows.length; i++) {{
-                            const row = rows[i];
-                            const cells = row.querySelectorAll('td');
+            await historial_icon.click()
+            logger.info("Clic en ícono de historial")
 
-                            // Buscar "CUI {cui}" exacto (con formato completo) en columna de descripción (celda 7)
-                            const descripcion = cells[7] ? cells[7].textContent : '';
-
-                            if (descripcion.includes('CUI {cui}')) {{
-                                console.log(`✅ CUI {cui} EXACTO encontrado en fila ${{i}}`);
-                                const historialIcon = row.querySelector('td:last-child a.ui-commandlink:first-child');
-                                if (historialIcon) {{
-                                    historialIcon.click();
-                                    return {{ success: true, rowIndex: i, pagina: {pagina_actual} }};
-                                }} else {{
-                                    return {{ success: false, error: 'Ícono de historial no encontrado' }};
-                                }}
-                            }}
-                        }}
-
-                        return {{ success: false, notFound: true }};
-                    }})()
-                ''')
-
-                if historial_result.get('success'):
-                    logger.info(f"✅ CUI {cui} encontrado en página {pagina_actual}, fila {historial_result.get('rowIndex')}")
-
-                    # Esperar a que cargue el historial
-                    await page.wait_for_selector('text=Visualizar historial de contratación', timeout=30000, state='visible')
-                    logger.info("Historial cargado")
-                    return
-
-                if not historial_result.get('notFound'):
-                    # Error inesperado
-                    error_msg = historial_result.get('error', 'Error desconocido')
-                    logger.error(f"Error en búsqueda: {error_msg}")
-                    raise ExtractionException(f"Error buscando CUI: {error_msg}")
-
-                # No encontrado en esta página, verificar si hay más páginas
-                logger.info(f"CUI {cui} no encontrado en página {pagina_actual}, buscando siguiente página...")
-
-                # Intentar hacer clic en botón "Siguiente página"
-                siguiente_clicked = await page.evaluate('''
-                    (() => {
-                        const nextButton = document.querySelector('#tbBuscador\\\\:idFormBuscarProceso\\\\:pnlGrdResultadosProcesos .ui-paginator-next:not(.ui-state-disabled)');
-                        if (nextButton) {
-                            nextButton.click();
-                            return true;
-                        }
-                        return false;
-                    })()
-                ''')
-
-                if not siguiente_clicked:
-                    logger.warning(f"No hay más páginas disponibles. CUI {cui} no encontrado en {pagina_actual} páginas.")
-                    raise ExtractionException(f"CUI {cui} no encontrado en ninguna de las {pagina_actual} páginas de resultados")
-
-                # Esperar a que cargue la siguiente página
-                await page.wait_for_timeout(3000)
-                pagina_actual += 1
-
-            # Si llegamos aquí, alcanzamos el límite de páginas
-            logger.error(f"Límite de {max_paginas} páginas alcanzado sin encontrar CUI {cui}")
-            raise ExtractionException(f"CUI {cui} no encontrado después de {max_paginas} páginas")
+            # Esperar a que cargue el historial - buscar por texto "Visualizar historial"
+            await page.wait_for_selector('text=Visualizar historial de contratación', timeout=30000, state='visible')
+            logger.info("Historial cargado")
 
         except Exception as e:
             logger.error(f"Error navegando a historial: {str(e)}")
             raise ExtractionException(f"Error navegando a historial: {str(e)}")
-    
+
     async def _navegar_a_ficha_seleccion(self, page: Page):
         """Navega a la ficha de selección (segundo ícono en la tabla de historial)"""
         logger.info("Navegando a ficha de selección")
 
         try:
-            # Esperar a que se cargue la tabla de historial
-            await page.wait_for_selector('table tbody tr', timeout=30000, state='visible')
-
-            # Buscar todos los enlaces en la columna de Acciones (última celda)
-            # El segundo enlace (índice 1) es el ícono de ficha
-            ficha_icons = await page.query_selector_all('table tbody tr td:last-child a.ui-commandlink')
-
-            if len(ficha_icons) < 2:
-                raise ExtractionException("No se encontró el ícono de ficha en el historial")
-
-            # El segundo ícono (índice 1) es la ficha de selección
-            await ficha_icons[1].click()
+            # Buscar todas las tablas y encontrar la que tiene la columna "Acciones"
+            # En la página de historial, buscar el segundo ícono (ficha) en la primera fila
+            ficha_icon = await page.wait_for_selector(
+                'table tbody tr:first-child td:last-child a.ui-commandlink:nth-child(2)',
+                timeout=30000,
+                state='visible'
+            )
+            await ficha_icon.click()
             logger.info("Clic en ícono de ficha")
 
             # Esperar a que cargue la ficha - buscar el tab "Ficha de Seleccion"
             await page.wait_for_selector('text=Ficha de Seleccion', timeout=30000, state='visible')
             logger.info("Ficha cargada")
-            
+
         except Exception as e:
             logger.error(f"Error navegando a ficha: {str(e)}")
             raise ExtractionException(f"Error navegando a ficha: {str(e)}")
-    
-    async def _extraer_informacion_ficha(self, page: Page, cui: str, anio: int) -> ObraSEACE:
-        """Extrae toda la información de la ficha de selección"""
-        logger.info("Extrayendo información de la ficha")
-        
+
+    async def _navegar_a_integrantes(self, page: Page):
+        """Navega a 'Ver integrantes y encargado' para extraer el número de contrato"""
+        logger.info("Navegando a 'Ver integrantes y encargado'")
+
         try:
-            # Esperar a que la página cargue completamente
-            await page.wait_for_timeout(2000)
-            
-            # Esperar a que aparezca un elemento clave de la ficha
-            await page.wait_for_selector('text=Tipo de documento', timeout=30000, state='visible')
-            logger.info("Ficha de documentos cargada")
-            
-            # Extraer información usando el método de búsqueda por label
+            # Buscar y hacer clic en el enlace
+            integrantes_link = await page.wait_for_selector(
+                'a:has-text("Ver integrantes y encargado")',
+                timeout=30000,
+                state='visible'
+            )
+            await integrantes_link.click()
+            logger.info("Clic en 'Ver integrantes'")
+
+            # Esperar a que cargue la página
+            await page.wait_for_selector('span.ui-outputlabel:text-is("Tipo de documento")', timeout=30000, state='visible')
+            logger.info("Página integrantes cargada")
+
+        except Exception as e:
+            logger.error(f"Error navegando a integrantes: {str(e)}")
+            raise ExtractionException(f"Error navegando a integrantes: {str(e)}")
+
+    async def _extraer_numero_contrato(self, page: Page) -> Optional[str]:
+        """Extrae el número de contrato desde la página de integrantes"""
+        logger.info("Extrayendo número de contrato")
+
+        try:
+            # Buscar el campo "Tipo de documento" que contiene el número de contrato
+            numero_contrato = await self._extraer_texto_por_label(page, "Tipo de documento")
+
+            if numero_contrato:
+                logger.info(f"Número de contrato extraído: {numero_contrato}")
+                return numero_contrato
+            else:
+                logger.warning("No se encontró el número de contrato")
+                return None
+
+        except Exception as e:
+            logger.warning(f"Error extrayendo número de contrato: {str(e)}")
+            return None
+
+    async def _extraer_datos_completos(self, page: Page, cui: str, anio: int) -> ObraSEACE:
+        """Extrae todos los datos de la ficha de selección"""
+        logger.info("Extrayendo datos de la ficha de selección")
+
+        try:
+            # Extraer Nomenclatura
             nomenclatura = await self._extraer_texto_por_label(page, "Nomenclatura")
-            normativa_aplicable = await self._extraer_texto_por_label(page, "Normativa Aplicable")
-            objeto_contratacion = await self._extraer_texto_por_label(page, "Objeto de Contratación")
-            descripcion = await self._extraer_texto_por_label(page, "Descripción del Objeto")
-            entidad_convocante = await self._extraer_texto_por_label(page, "Entidad Convocante")
-            fecha_publicacion = await self._extraer_texto_por_label(page, "Fecha y Hora Publicación")
-            tipo_compra = await self._extraer_texto_por_label(page, "Tipo Compra o Selección")
+
+            # Extraer Número de Convocatoria
             numero_convocatoria = await self._extraer_texto_por_label(page, "N° Convocatoria")
-            
-            # Extraer monto contractual (formato especial)
-            monto_text = await self._extraer_texto_por_label(page, "VR / VE / Cuantía de la contratación")
-            monto_contractual = None
-            if monto_text:
-                # Limpiar el texto y convertir a float
-                monto_limpio = monto_text.replace(',', '').replace(' ', '').strip()
-                try:
-                    monto_contractual = float(monto_limpio)
-                except ValueError:
-                    logger.warning(f"No se pudo convertir el monto: {monto_text}")
-            
-            # Validar que se hayan extraído datos mínimos
-            if not nomenclatura:
-                raise ExtractionException("No se pudo extraer la nomenclatura de la obra")
-            
+
+            # Extraer Tipo Compra o Selección
+            tipo_compra = await self._extraer_texto_por_label(page, "Tipo Compra o Selección")
+
+            # Extraer Normativa Aplicable
+            normativa_aplicable = await self._extraer_texto_por_label(page, "Normativa Aplicable")
+
+            # Extraer Entidad Convocante
+            entidad_convocante = await self._extraer_texto_por_label(page, "Entidad Convocante")
+
+            # Extraer Objeto de Contratación
+            objeto_contratacion = await self._extraer_texto_por_label(page, "Objeto de Contratación")
+
+            # Extraer Descripción del Objeto
+            descripcion = await self._extraer_texto_por_label(page, "Descripción del Objeto")
+
+            # Extraer VR / VE / Cuantía de la contratación
+            monto_str = await self._extraer_texto_por_label(page, "VR / VE / Cuantía de la contratación")
+            monto_contractual = self._limpiar_monto(monto_str)
+
+            # Extraer Fecha y Hora Publicación
+            fecha_publicacion = await self._extraer_texto_por_label(page, "Fecha y Hora Publicación")
+
             # Crear objeto ObraSEACE
-            obra = ObraSEACE(
+            obra_data = ObraSEACE(
                 nomenclatura=nomenclatura or "",
+                numero_contrato=None,  # Se extraerá después desde "Ver integrantes y encargado"
                 normativa_aplicable=normativa_aplicable or "",
                 objeto_contratacion=objeto_contratacion or "",
                 descripcion=descripcion or "",
@@ -359,46 +316,52 @@ class SEACEService:
                 numero_convocatoria=numero_convocatoria,
                 entidad_convocante=entidad_convocante,
                 fecha_publicacion=fecha_publicacion,
-                tipo_compra=tipo_compra,
-                fuente="SEACE"
+                tipo_compra=tipo_compra
             )
-            
-            logger.info(f"Información extraída exitosamente: {nomenclatura}")
-            return obra
-            
+
+            logger.info(f"Datos extraídos exitosamente: {obra_data.dict()}")
+            return obra_data
+
         except Exception as e:
-            logger.error(f"Error extrayendo información de la ficha: {str(e)}")
-            raise ExtractionException(f"Error extrayendo información: {str(e)}")
-    
+            logger.error(f"Error extrayendo datos completos: {str(e)}")
+            raise ExtractionException(f"Error extrayendo datos completos: {str(e)}")
+
     async def _extraer_texto_por_label(self, page: Page, label: str) -> Optional[str]:
-        """Extrae el texto asociado a un label específico usando estructura de tabla"""
+        """Extrae el texto asociado a un label específico"""
         try:
-            # Buscar todas las filas de tabla
-            rows = await page.query_selector_all('tr')
-            
-            for row in rows:
-                # Buscar las celdas de la fila
-                cells = await row.query_selector_all('td')
-                if len(cells) >= 2:
-                    # Primera celda contiene el label
-                    label_text = await cells[0].inner_text()
-                    label_text = label_text.strip()
-                    
-                    # Comparar con el label buscado (con o sin ":")
-                    if label_text == label or label_text == f"{label}:":
-                        # Segunda celda contiene el valor
-                        value_text = await cells[1].inner_text()
-                        value_text = value_text.strip()
-                        logger.info(f"Extraído {label}: {value_text}")
-                        return value_text
-            
-            logger.warning(f"No se encontró el elemento para {label}")
-            return None
-        
+            # Buscar el elemento que contiene el label
+            selector = f'span.ui-outputlabel:text-is("{label}") ~ span.halfSizeText'
+
+            # Intentar encontrar el elemento
+            element = await page.query_selector(selector)
+
+            if element:
+                texto = await element.inner_text()
+                texto = texto.strip()
+                logger.info(f"Extraído {label}: {texto}")
+                return texto
+            else:
+                logger.warning(f"No se encontró el elemento para {label}")
+                return None
+
         except Exception as e:
             logger.warning(f"Error extrayendo {label}: {str(e)}")
             return None
 
+    def _limpiar_monto(self, monto_str: Optional[str]) -> float:
+        """Limpia el string del monto y lo convierte a float"""
+        if not monto_str:
+            return 0.0
 
-# Singleton instance
+        try:
+            # Extraer solo los números y punto decimal
+            # Ejemplo: "640,251.96 Soles" -> "640251.96"
+            monto_limpio = re.sub(r'[^\d.]', '', monto_str.replace(',', ''))
+            return float(monto_limpio)
+        except Exception as e:
+            logger.warning(f"Error limpiando monto '{monto_str}': {str(e)}")
+            return 0.0
+
+
+# Instancia del servicio
 seace_service = SEACEService()
