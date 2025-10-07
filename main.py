@@ -57,6 +57,17 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Cargar router de MEF Invierte
+try:
+    print("[LOADING] Cargando router de MEF Invierte...")
+    from app.api.routes.mef_invierte import router as mef_invierte_router
+    app.include_router(mef_invierte_router)
+    print("[OK] Router de MEF Invierte cargado exitosamente")
+except Exception as e:
+    print(f"[ERROR] Error cargando router de MEF Invierte: {e}")
+    import traceback
+    traceback.print_exc()
+
 # Cargar router de ubicaciones (San Marcos)
 try:
     print("[LOADING] Cargando router de ubicaciones...")
