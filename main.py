@@ -7,19 +7,10 @@ import os
 import random
 from datetime import datetime
 from typing import Dict, Any
-import logging
-import sys
-
-# Configurar logging básico para que todos los loggers envíen a stdout
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s:%(name)s:%(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
 
 # NO importar Playwright al inicio - solo cuando se necesite
 app = FastAPI(
-    title="API de Valorizaciones - Inicio Rápido",
+    title="API de Valorizaciones - Inicio Rápido", 
     description="Backend con Playwright lazy loading para inicio rápido",
     version="4.2.1"
 )
@@ -54,6 +45,17 @@ try:
     print("[OK] Router de SEACE cargado exitosamente")
 except Exception as e:
     print(f"[ERROR] Error cargando router de SEACE: {e}")
+    import traceback
+    traceback.print_exc()
+
+# Cargar router de MEF Invierte
+try:
+    print("[LOADING] Cargando router de MEF Invierte...")
+    from app.api.routes.mef_invierte import router as mef_invierte_router
+    app.include_router(mef_invierte_router)
+    print("[OK] Router de MEF Invierte cargado exitosamente")
+except Exception as e:
+    print(f"[ERROR] Error cargando router de MEF Invierte: {e}")
     import traceback
     traceback.print_exc()
 
