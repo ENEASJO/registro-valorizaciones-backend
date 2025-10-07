@@ -35,16 +35,25 @@ async def scrape_mef_invierte(cui: str):
 
     async with async_playwright() as p:
         print("[MEF] Iniciando Playwright...", flush=True)
-        # Configurar browser
+        # Configurar browser con args adicionales
         browser = await p.chromium.launch(
             headless=True,
-            args=['--no-sandbox', '--disable-setuid-sandbox']
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-web-security',
+                '--ignore-certificate-errors'
+            ]
         )
         print("[MEF] Browser lanzado", flush=True)
 
         try:
             context = await browser.new_context(
-                viewport={'width': 1920, 'height': 1080}
+                viewport={'width': 1920, 'height': 1080},
+                ignore_https_errors=True,
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             )
             page = await context.new_page()
             print("[MEF] Página creada", flush=True)
@@ -54,8 +63,8 @@ async def scrape_mef_invierte(cui: str):
             logger.info("1. Navegando a página de consulta MEF Invierte...")
             await page.goto(
                 'https://ofi5.mef.gob.pe/invierte/consultapublica/consultainversiones',
-                wait_until='domcontentloaded',
-                timeout=60000
+                wait_until='load',
+                timeout=90000
             )
             print("[MEF] Página cargada exitosamente", flush=True)
             await page.wait_for_timeout(2000)
