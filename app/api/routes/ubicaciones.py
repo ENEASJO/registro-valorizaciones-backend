@@ -45,14 +45,34 @@ async def listar_ubicaciones_agrupadas(
     result = await db.execute(stmt)
     rows: List[UbicacionDB] = result.scalars().all()
 
-    centros = [r.nombre for r in rows if (r.tipo or '').upper() == 'CENTRO_POBLADO']
-    caserios = [r.nombre for r in rows if (r.tipo or '').upper() == 'CASERIO']
+    # Agrupar por tipo
+    urbana = []
+    centro_poblado = []
+    caserio = []
+
+    for r in rows:
+        tipo_upper = (r.tipo or '').upper()
+        ubicacion_data = {
+            "id": r.id,
+            "nombre": r.nombre,
+            "tipo": r.tipo.lower() if r.tipo else '',
+            "departamento": r.departamento,
+            "provincia": r.provincia,
+            "distrito": r.distrito
+        }
+
+        if tipo_upper == 'URBANA' or tipo_upper == 'ZONA_URBANA':
+            urbana.append(ubicacion_data)
+        elif tipo_upper == 'CENTRO_POBLADO':
+            centro_poblado.append(ubicacion_data)
+        elif tipo_upper == 'CASERIO':
+            caserio.append(ubicacion_data)
 
     return {
-        "success": True,
+        "status": "success",
         "data": {
-            "centros_poblados": centros,
-            "caserios": caserios,
-            "total": len(rows)
+            "urbana": urbana,
+            "centro_poblado": centro_poblado,
+            "caserio": caserio
         }
     }
