@@ -88,9 +88,9 @@ async def verificar_cui_existe(database: Database, cui: str) -> Optional[dict]:
 
 
 async def guardar_datos_mef(database: Database, cui: str, datos_mef: dict, force: bool = False):
-    """Guarda o actualiza datos MEF en la base de datos"""
+    """Guarda o actualiza datos MEF en la base de datos o caché"""
 
-    # Verificar si ya existe
+    # Verificar si ya existe obra
     obra_existente = await verificar_cui_existe(database, cui)
 
     if obra_existente and not force:
@@ -118,10 +118,24 @@ async def guardar_datos_mef(database: Database, cui: str, datos_mef: dict, force
             print_info(f"Obra: {obra_existente['codigo']} - {obra_existente['nombre']}")
             return True
         else:
-            print_warning(f"CUI {cui} no tiene obra asociada en la BD")
-            print_info("Los datos fueron scraped correctamente pero NO se guardaron")
-            print_info("Primero crea la obra en el sistema, luego ejecuta este script")
-            return False
+            # Guardar en caché temporal
+            await database.execute(
+                """
+                INSERT INTO mef_cache (cui, datos_mef, fecha_scraping, ultima_actualizacion)
+                VALUES (:cui, :datos_mef, NOW(), NOW())
+                ON CONFLICT (cui)
+                DO UPDATE SET
+                    datos_mef = EXCLUDED.datos_mef,
+                    ultima_actualizacion = NOW()
+                """,
+                {
+                    "cui": cui,
+                    "datos_mef": json.dumps(datos_mef)
+                }
+            )
+            print_success(f"Datos MEF guardados en caché para CUI {cui}")
+            print_info("Los datos están disponibles para autocompletar formularios")
+            return True
 
     except Exception as e:
         print_error(f"Error guardando en BD: {e}")

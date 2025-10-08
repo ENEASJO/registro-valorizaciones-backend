@@ -212,7 +212,7 @@ async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
 
         logger.info(f"[CONSULTA MEF] Buscando datos para CUI: {cui}")
 
-        # Primero: buscar en base de datos (caché)
+        # Primero: buscar en obras existentes (caché principal)
         obra = await database.fetch_one(
             """
             SELECT
@@ -226,9 +226,9 @@ async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
             {"cui": cui}
         )
 
-        # Si encontramos datos en caché, retornarlos
+        # Si encontramos datos en obras, retornarlos
         if obra and obra['datos_mef']:
-            logger.info(f"[CONSULTA MEF] ✅ Datos encontrados en caché para CUI {cui}")
+            logger.info(f"[CONSULTA MEF] ✅ Datos encontrados en obras para CUI {cui}")
             return {
                 "success": True,
                 "found": True,
@@ -240,8 +240,37 @@ async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
                 },
                 "cache_info": {
                     "ultima_actualizacion": str(obra['fecha_actualizacion_mef']) if obra['fecha_actualizacion_mef'] else None,
-                    "fuente": "Base de datos (caché)",
-                    "message": "Datos leídos desde caché (sin scraping)"
+                    "fuente": "Base de datos - Obras (caché principal)",
+                    "message": "Datos leídos desde obra existente (sin scraping)"
+                }
+            }
+
+        # Segundo: buscar en tabla mef_cache (datos pre-scraped localmente)
+        cache = await database.fetch_one(
+            """
+            SELECT
+                datos_mef,
+                fecha_scraping,
+                ultima_actualizacion
+            FROM mef_cache
+            WHERE cui = :cui
+            """,
+            {"cui": cui}
+        )
+
+        # Si encontramos datos en caché temporal, retornarlos
+        if cache and cache['datos_mef']:
+            logger.info(f"[CONSULTA MEF] ✅ Datos encontrados en caché temporal para CUI {cui}")
+            return {
+                "success": True,
+                "found": True,
+                "cui": cui,
+                "data": cache['datos_mef'],
+                "cache_info": {
+                    "fecha_scraping": str(cache['fecha_scraping']) if cache['fecha_scraping'] else None,
+                    "ultima_actualizacion": str(cache['ultima_actualizacion']) if cache['ultima_actualizacion'] else None,
+                    "fuente": "Caché temporal MEF (pre-scraped localmente)",
+                    "message": "Datos obtenidos mediante scraping local previo"
                 }
             }
 
