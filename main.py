@@ -83,10 +83,21 @@ except Exception as e:
 try:
     print("[LOADING] Cargando router de obras MEF...")
     from app.api.routes.obras_mef import router as obras_mef_router
-    app.include_router(obras_mef_router, prefix="/api/v1/obras")
+    app.include_router(obras_mef_router, prefix="/api/v1")
     print("[OK] Router de obras MEF cargado exitosamente")
 except Exception as e:
     print(f"[ERROR] Error cargando router de obras MEF: {e}")
+    import traceback
+    traceback.print_exc()
+
+# Cargar router CRUD completo de obras
+try:
+    print("[LOADING] Cargando router completo de obras...")
+    from app.api.routes.obras import router as obras_router
+    app.include_router(obras_router)  # Sin prefix, el router ya define /obras
+    print("[OK] Router completo de obras cargado exitosamente")
+except Exception as e:
+    print(f"[ERROR] Error cargando router completo de obras: {e}")
     import traceback
     traceback.print_exc()
 
@@ -491,23 +502,24 @@ async def listar_empresas():
 """
 
 
-@app.get("/obras")
-async def listar_obras():
-    return {
-        "success": True,
-        "data": [],
-        "message": "Endpoint obras temporal",
-        "timestamp": datetime.now().isoformat()
-    }
+# Endpoints temporales comentados - ahora se usa el router completo de obras
+# @app.get("/obras")
+# async def listar_obras():
+#     return {
+#         "success": True,
+#         "data": [],
+#         "message": "Endpoint obras temporal",
+#         "timestamp": datetime.now().isoformat()
+#     }
 
-@app.post("/obras")
-async def crear_obra(data: dict):
-    return {
-        "success": True,
-        "data": {"id": 1, **data},
-        "message": "Obra creada (temporal)",
-        "timestamp": datetime.now().isoformat()
-    }
+# @app.post("/obras")
+# async def crear_obra(data: dict):
+#     return {
+#         "success": True,
+#         "data": {"id": 1, **data},
+#         "message": "Obra creada (temporal)",
+#         "timestamp": datetime.now().isoformat()
+#     }
 
 @app.get("/valorizaciones")
 async def listar_valorizaciones():
