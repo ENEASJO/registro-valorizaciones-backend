@@ -377,9 +377,14 @@ async def buscar_inversiones_mef(search_input: MEFInvierteSearchInput) -> Dict[s
     description="Endpoint para verificar que el servicio MEF Invierte está funcionando correctamente",
     tags=["Health"]
 )
-async def health_check_mef() -> Dict[str, Any]:
+async def health_check_mef(request: Request) -> Dict[str, Any]:
     """Verificar estado del servicio MEF Invierte"""
     db_status = "connected" if database else "not_configured"
+
+    # Debug: obtener IP del cliente
+    client_ip = request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP", request.client.host))
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
 
     return {
         "status": "healthy",
@@ -388,6 +393,11 @@ async def health_check_mef() -> Dict[str, Any]:
         "version": "2.0.0",
         "architecture": "cache-first with protected scraping",
         "database": db_status,
+        "debug": {
+            "your_ip": client_ip,
+            "admin_ips_loaded": ADMIN_IPS,
+            "is_authorized": client_ip in ADMIN_IPS
+        },
         "features": [
             "Consulta rápida desde caché (todos los usuarios)",
             "Scraping protegido por IP (solo administrador)",
