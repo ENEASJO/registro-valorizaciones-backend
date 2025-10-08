@@ -18,7 +18,7 @@ from app.services.mef_invierte_service import consultar_cui_mef, consultar_cui_m
 logger = logging.getLogger(__name__)
 
 # IPs autorizadas para hacer scraping real (solo administrador)
-ADMIN_IPS = os.getenv("ADMIN_IPS", "127.0.0.1").split(",")
+ADMIN_IPS = [ip.strip() for ip in os.getenv("ADMIN_IPS", "127.0.0.1").split(",")]
 logger.info(f"IPs autorizadas para scraping MEF: {ADMIN_IPS}")
 
 # Conexión a base de datos
