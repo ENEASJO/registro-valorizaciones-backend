@@ -229,11 +229,17 @@ async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
         # Si encontramos datos en obras, retornarlos
         if obra and obra['datos_mef']:
             logger.info(f"[CONSULTA MEF] ✅ Datos encontrados en obras para CUI {cui}")
+            # Parse JSON si viene como string desde PostgreSQL
+            datos_mef = obra['datos_mef']
+            if isinstance(datos_mef, str):
+                import json
+                datos_mef = json.loads(datos_mef)
+
             return {
                 "success": True,
                 "found": True,
                 "cui": cui,
-                "data": obra['datos_mef'],
+                "data": datos_mef,
                 "obra_info": {
                     "nombre": obra['nombre'],
                     "codigo": obra['codigo']
@@ -261,11 +267,17 @@ async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
         # Si encontramos datos en caché temporal, retornarlos
         if cache and cache['datos_mef']:
             logger.info(f"[CONSULTA MEF] ✅ Datos encontrados en caché temporal para CUI {cui}")
+            # Parse JSON si viene como string desde PostgreSQL
+            datos_mef = cache['datos_mef']
+            if isinstance(datos_mef, str):
+                import json
+                datos_mef = json.loads(datos_mef)
+
             return {
                 "success": True,
                 "found": True,
                 "cui": cui,
-                "data": cache['datos_mef'],
+                "data": datos_mef,
                 "cache_info": {
                     "fecha_scraping": str(cache['fecha_scraping']) if cache['fecha_scraping'] else None,
                     "ultima_actualizacion": str(cache['ultima_actualizacion']) if cache['ultima_actualizacion'] else None,
