@@ -179,27 +179,26 @@ async def actualizar_mef_scraping(mef_input: MEFInvierteInput, request: Request)
 
 @router.get(
     "/consultar/{cui}",
-    summary="[PÚBLICO] Consultar datos MEF desde caché",
-    description="Consulta datos MEF ya scraped y guardados en BD (RÁPIDO, para todos los usuarios)",
-    response_description="Datos MEF desde caché"
+    summary="[PÚBLICO] Consultar datos MEF (con scraping automático)",
+    description="Consulta datos MEF desde BD. Si no existen, hace scraping automático y los guarda.",
+    response_description="Datos MEF desde caché o scraping"
 )
 async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
     """
     📖 ENDPOINT PÚBLICO - Para todos los usuarios
 
-    Consulta datos MEF que fueron previamente scraped y guardados en BD.
-    NO hace scraping, solo lee de la base de datos (súper rápido).
+    Consulta datos MEF. Primero busca en BD (caché), si no encuentra hace scraping automático.
 
     Usado cuando:
     - Usuarios consultan obras existentes
-    - Frontend muestra datos de obras
+    - Frontend autocompleta formularios con datos MEF
 
     - **cui**: Código Único de Inversiones en la URL (ejemplo: "2595080")
 
     Retorna:
-    - Datos MEF guardados en BD
+    - Datos MEF (desde caché o scraping nuevo)
     - Fecha de última actualización
-    - Si no existe, mensaje para solicitar al admin
+    - Fuente de los datos (caché o scraping)
     """
     try:
         if not database:
@@ -211,9 +210,9 @@ async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
                 }
             )
 
-        logger.info(f"[CONSULTA CACHE] Buscando datos MEF para CUI: {cui}")
+        logger.info(f"[CONSULTA MEF] Buscando datos para CUI: {cui}")
 
-        # Buscar en base de datos
+        # Primero: buscar en base de datos (caché)
         obra = await database.fetch_one(
             """
             SELECT
@@ -227,35 +226,55 @@ async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
             {"cui": cui}
         )
 
-        if not obra or not obra['datos_mef']:
-            logger.warning(f"[CONSULTA CACHE] No se encontraron datos MEF para CUI {cui}")
+        # Si encontramos datos en caché, retornarlos
+        if obra and obra['datos_mef']:
+            logger.info(f"[CONSULTA MEF] ✅ Datos encontrados en caché para CUI {cui}")
+            return {
+                "success": True,
+                "found": True,
+                "cui": cui,
+                "data": obra['datos_mef'],
+                "obra_info": {
+                    "nombre": obra['nombre'],
+                    "codigo": obra['codigo']
+                },
+                "cache_info": {
+                    "ultima_actualizacion": str(obra['fecha_actualizacion_mef']) if obra['fecha_actualizacion_mef'] else None,
+                    "fuente": "Base de datos (caché)",
+                    "message": "Datos leídos desde caché (sin scraping)"
+                }
+            }
+
+        # Si NO hay datos en caché, hacer scraping automático
+        logger.info(f"[CONSULTA MEF] 🔍 No hay datos en caché. Iniciando scraping automático para CUI {cui}")
+
+        # Hacer scraping
+        resultado = await consultar_cui_mef(cui)
+
+        if not resultado.get("success"):
+            logger.warning(f"[CONSULTA MEF] ❌ No se encontró información en MEF para CUI {cui}")
             raise HTTPException(
                 status_code=404,
                 detail={
                     "error": True,
                     "found": False,
-                    "message": "CUI no encontrado en la base de datos",
+                    "message": "CUI no encontrado en MEF Invierte",
                     "cui": cui,
-                    "info": "Este CUI no ha sido scraped aún. Solicita al administrador actualizar los datos.",
-                    "hint": "El administrador debe usar el endpoint /actualizar para obtener los datos"
+                    "info": resultado.get("error", "No se encontró información en MEF")
                 }
             )
 
-        logger.info(f"[CONSULTA CACHE] Datos MEF encontrados para CUI {cui}")
+        logger.info(f"[CONSULTA MEF] ✅ Scraping exitoso para CUI {cui}")
 
+        # Retornar datos del scraping (sin guardar en BD aún, porque no hay obra creada)
         return {
             "success": True,
             "found": True,
             "cui": cui,
-            "data": obra['datos_mef'],
-            "obra_info": {
-                "nombre": obra['nombre'],
-                "codigo": obra['codigo']
-            },
+            "data": resultado.get("data"),
             "cache_info": {
-                "ultima_actualizacion": str(obra['fecha_actualizacion_mef']) if obra['fecha_actualizacion_mef'] else None,
-                "fuente": "Base de datos (caché)",
-                "message": "Datos leídos desde caché (sin scraping)"
+                "fuente": "MEF Invierte (scraping en tiempo real)",
+                "message": "Datos obtenidos mediante scraping. Se guardarán al crear la obra."
             }
         }
 
@@ -263,7 +282,7 @@ async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
         raise
 
     except Exception as e:
-        logger.error(f"[CONSULTA CACHE] Error inesperado: {str(e)}")
+        logger.error(f"[CONSULTA MEF] Error inesperado: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail={
