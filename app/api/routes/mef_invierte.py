@@ -75,7 +75,10 @@ async def actualizar_mef_scraping(mef_input: MEFInvierteInput, request: Request)
     - Confirmación de guardado en BD
     - Timestamp de actualización
     """
-    client_ip = request.client.host
+    # Obtener IP real del cliente (considerando proxies/load balancers)
+    client_ip = request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP", request.client.host))
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()  # Primera IP en la cadena
 
     # Verificar IP autorizada
     if client_ip not in ADMIN_IPS:
@@ -286,7 +289,10 @@ async def consultar_inversion_mef(mef_input: MEFInvierteInput, request: Request)
     - /actualizar si es IP de admin (hace scraping)
     - /consultar/{cui} si es usuario normal (lee caché)
     """
-    client_ip = request.client.host
+    # Obtener IP real del cliente (considerando proxies/load balancers)
+    client_ip = request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP", request.client.host))
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
 
     if client_ip in ADMIN_IPS:
         logger.info(f"[LEGACY] Redirigiendo a /actualizar para IP admin: {client_ip}")
