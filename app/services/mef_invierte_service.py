@@ -27,18 +27,12 @@ async def consultar_cui_mef(cui: str, timeout: int = 300000) -> Dict[str, Any]:
 
     try:
         async with async_playwright() as p:
-            # Iniciar navegador con optimizaciones para recursos limitados (Render FREE tier)
+            # Iniciar navegador con configuración simple (igual a Node que funciona)
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
                     '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',  # Evita problemas de memoria compartida
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',  # Reducir uso de memoria
-                    '--disable-gpu'
+                    '--disable-setuid-sandbox'
                 ]
             )
 
@@ -510,18 +504,12 @@ async def consultar_cui_mef_con_nombre(
 
     try:
         async with async_playwright() as p:
-            # Usar mismas optimizaciones que en consultar_cui_mef
+            # Configuración simple (igual a Node que funciona)
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
                     '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-gpu'
+                    '--disable-setuid-sandbox'
                 ]
             )
 
