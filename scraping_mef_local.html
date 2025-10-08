@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEF Invierte - Scraping Local con Caché Neon</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+
+        .panel h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(17, 153, 142, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #e0e0e0;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.active {
+            display: block;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .result h3 {
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .history-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-cui {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 16px;
+        }
+
+        .history-time {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .history-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .history-status.cached {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .history-status.scraped {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .chip {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            margin: 5px 5px 5px 0;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .chip:hover {
+            background: #764ba2;
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏗️ MEF Invierte - Scraping Local</h1>
+            <p class="subtitle">Extracción de datos con guardado automático en Neon PostgreSQL</p>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalScraped">0</div>
+                    <div class="stat-label">Total Scraped</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="todayScraped">0</div>
+                    <div class="stat-label">Hoy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="cachedCount">0</div>
+                    <div class="stat-label">En Caché Neon</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Panel de Scraping -->
+            <div class="panel">
+                <h2>🔍 Scraping de CUIs</h2>
+
+                <form id="scrapingForm">
+                    <div class="form-group">
+                        <label>CUI (Código Único de Inversiones)</label>
+                        <input
+                            type="text"
+                            id="cui"
+                            placeholder="2595080"
+                            required
+                        >
+                        <small style="color: #666; display: block; margin-top: 5px;">
+                            💡 Un CUI por línea o separados por coma
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>CUIs de ejemplo (click para usar):</label>
+                        <span class="chip" onclick="useCUI('2595080')">2595080</span>
+                        <span class="chip" onclick="useCUI('2485678')">2485678</span>
+                        <span class="chip" onclick="useCUI('2396547')">2396547</span>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn-primary" id="scrapBtn">
+                            🔍 Scrape & Guardar
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="clearResults()">
+                            🗑️ Limpiar
+                        </button>
+                    </div>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p id="loadingText">Scraping MEF Invierte...</p>
+                    <p class="timer" id="timer"></p>
+                </div>
+
+                <div class="result" id="result"></div>
+            </div>
+
+            <!-- Panel de Historial -->
+            <div class="panel">
+                <h2>📋 Historial de Scraping</h2>
+                <div class="history-list" id="historyList">
+                    <p style="text-align: center; color: #999; padding: 40px 0;">
+                        No hay historial aún
+                    </p>
+                </div>
+                <button class="btn-secondary" style="width: 100%; margin-top: 15px;" onclick="clearHistory()">
+                    🗑️ Limpiar Historial
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1/mef-invierte';
+        let startTime;
+        let timerInterval;
+        let history = JSON.parse(localStorage.getItem('mef_history') || '[]');
+
+        // Inicializar al cargar
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStats();
+            renderHistory();
+            document.getElementById('cui').focus();
+        });
+
+        function useCUI(cui) {
+            document.getElementById('cui').value = cui;
+            document.getElementById('cui').focus();
+        }
+
+        function clearResults() {
+            document.getElementById('result').classList.remove('active');
+            document.getElementById('cui').value = '';
+            document.getElementById('cui').focus();
+        }
+
+        function clearHistory() {
+            if (confirm('¿Seguro que deseas limpiar el historial local?')) {
+                history = [];
+                localStorage.setItem('mef_history', JSON.stringify(history));
+                renderHistory();
+                updateStats();
+            }
+        }
+
+        function addToHistory(cui, status, data = null) {
+            const entry = {
+                cui,
+                status,
+                timestamp: new Date().toISOString(),
+                data
+            };
+            history.unshift(entry);
+
+            // Mantener solo últimos 50
+            if (history.length > 50) {
+                history = history.slice(0, 50);
+            }
+
+            localStorage.setItem('mef_history', JSON.stringify(history));
+            renderHistory();
+            updateStats();
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('historyList');
+
+            if (history.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px 0;">No hay historial aún</p>';
+                return;
+            }
+
+            container.innerHTML = history.map(entry => {
+                const date = new Date(entry.timestamp);
+                const timeStr = date.toLocaleString('es-PE');
+                const statusClass = entry.status === 'cached' ? 'cached' : 'scraped';
+                const statusText = entry.status === 'cached' ? '✅ Guardado' : '🔍 Scraped';
+
+                return `
+                    <div class="history-item">
+                        <div>
+                            <div class="history-cui">${entry.cui}</div>
+                            <div class="history-time">${timeStr}</div>
+                        </div>
+                        <div class="history-status ${statusClass}">${statusText}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateStats() {
+            const total = history.length;
+            const today = history.filter(entry => {
+                const entryDate = new Date(entry.timestamp).toDateString();
+                const todayDate = new Date().toDateString();
+                return entryDate === todayDate;
+            }).length;
+            const cached = history.filter(entry => entry.status === 'cached').length;
+
+            document.getElementById('totalScraped').textContent = total;
+            document.getElementById('todayScraped').textContent = today;
+            document.getElementById('cachedCount').textContent = cached;
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                document.getElementById('timer').textContent = `⏱️ ${elapsed}s`;
+            }, 100);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+            return elapsed;
+        }
+
+        async function scrapeCUI(cui) {
+            const response = await fetch(`${API_BASE}/consultar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ cui: cui.trim() })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail?.message || 'Error en scraping');
+            }
+
+            return await response.json();
+        }
+
+        async function saveToCache(cui, data) {
+            const loadingDiv = document.getElementById('loading');
+            const loadingText = document.getElementById('loadingText');
+
+            loadingText.textContent = `Guardando CUI ${cui} en Neon...`;
+
+            // Aquí llamamos al script Python directamente
+            // Nota: En producción, esto debería ser un endpoint API
+            const response = await fetch(`${API_BASE}/actualizar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Secret': 'local-admin-key' // Configurar en backend
+                },
+                body: JSON.stringify({ cui, force: true })
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al guardar en caché');
+            }
+
+            return await response.json();
+        }
+
+        document.getElementById('scrapingForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const cuiInput = document.getElementById('cui').value.trim();
+            const scrapBtn = document.getElementById('scrapBtn');
+            const loadingDiv = document.getElementById('loading');
+            const resultDiv = document.getElementById('result');
+
+            // Limpiar resultados anteriores
+            resultDiv.classList.remove('active', 'success', 'error', 'info');
+            resultDiv.innerHTML = '';
+
+            // Procesar múltiples CUIs
+            const cuis = cuiInput.split(/[,\n]/).map(c => c.trim()).filter(c => c);
+
+            if (cuis.length === 0) {
+                resultDiv.className = 'result active error';
+                resultDiv.innerHTML = '<h3>❌ Error</h3><p>Ingresa al menos un CUI válido</p>';
+                return;
+            }
+
+            // Mostrar loading
+            scrapBtn.disabled = true;
+            loadingDiv.classList.add('active');
+            startTimer();
+
+            const results = {
+                success: [],
+                errors: []
+            };
+
+            for (const cui of cuis) {
+                try {
+                    document.getElementById('loadingText').textContent = `Scraping CUI ${cui}...`;
+
+                    // 1. Scrape
+                    const scrapData = await scrapeCUI(cui);
+
+                    if (scrapData.success) {
+                        // 2. Guardar en historial local
+                        addToHistory(cui, 'scraped', scrapData.data);
+
+                        // 3. Intentar guardar en Neon (opcional, puede fallar)
+                        try {
+                            await saveToCache(cui, scrapData.data);
+                            addToHistory(cui, 'cached', scrapData.data);
+                            results.success.push({ cui, saved: true });
+                        } catch (saveError) {
+                            // Si falla el guardado, al menos tenemos el scraping
+                            results.success.push({ cui, saved: false, error: saveError.message });
+                        }
+                    } else {
+                        results.errors.push({ cui, error: scrapData.error || 'Error desconocido' });
+                    }
+                } catch (error) {
+                    results.errors.push({ cui, error: error.message });
+                }
+            }
+
+            const elapsed = stopTimer();
+
+            // Mostrar resultados
+            let html = `<h3>✅ Proceso completado (${elapsed}s)</h3>`;
+
+            if (results.success.length > 0) {
+                html += '<div style="margin-top: 15px;"><strong>✅ CUIs procesados:</strong><ul style="margin: 10px 0;">';
+                results.success.forEach(r => {
+                    const savedText = r.saved ? '💾 Guardado en Neon' : '⚠️ Solo scraped';
+                    html += `<li>${r.cui} - ${savedText}</li>`;
+                });
+                html += '</ul></div>';
+            }
+
+            if (results.errors.length > 0) {
+                html += '<div style="margin-top: 15px;"><strong>❌ Errores:</strong><ul style="margin: 10px 0;">';
+                results.errors.forEach(r => {
+                    html += `<li>${r.cui} - ${r.error}</li>`;
+                });
+                html += '</ul></div>';
+            }
+
+            resultDiv.className = 'result active ' + (results.errors.length > 0 ? 'info' : 'success');
+            resultDiv.innerHTML = html;
+
+            scrapBtn.disabled = false;
+            loadingDiv.classList.remove('active');
+        });
+    </script>
+</body>
+</html>

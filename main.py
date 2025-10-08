@@ -79,6 +79,17 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Cargar router de obras MEF
+try:
+    print("[LOADING] Cargando router de obras MEF...")
+    from app.api.routes.obras_mef import router as obras_mef_router
+    app.include_router(obras_mef_router, prefix="/api/v1/obras")
+    print("[OK] Router de obras MEF cargado exitosamente")
+except Exception as e:
+    print(f"[ERROR] Error cargando router de obras MEF: {e}")
+    import traceback
+    traceback.print_exc()
+
 # Cargar router de debug para empresas
 try:
     print("[LOADING] Cargando router de debug de empresas...")
