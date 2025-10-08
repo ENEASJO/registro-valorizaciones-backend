@@ -101,6 +101,15 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Cargar router de test de conectividad
+try:
+    print("[LOADING] Cargando router de test de conectividad...")
+    from app.api.routes.test_connectivity import router as test_router
+    app.include_router(test_router, prefix="/api/debug")
+    print("[OK] Router de test de conectividad cargado exitosamente")
+except Exception as e:
+    print(f"[WARNING] Error cargando router de test de conectividad: {e}")
+
 # Middleware para manejar headers de proxy (Cloud Run) - DEBE ESTAR ANTES DE CORS
 # Temporalmente desactivado para solucionar error 500
 enable_proxy_middleware = os.environ.get('ENABLE_PROXY_MIDDLEWARE', 'true').lower() == 'true'
