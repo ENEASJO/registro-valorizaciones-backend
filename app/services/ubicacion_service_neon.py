@@ -6,8 +6,26 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from typing import List, Dict, Any, Optional
 
-# Obtener URL de conexión a Neon
-NEON_CONNECTION_STRING = os.getenv("NEON_CONNECTION_STRING")
+# Obtener URL de conexión a Neon y limpiar parámetro incompatible
+def get_connection_string():
+    """
+    Obtiene la connection string de Neon y elimina parámetros incompatibles con psycopg2
+    """
+    conn_str = os.getenv("NEON_CONNECTION_STRING")
+
+    if not conn_str:
+        # Fallback connection string
+        return "postgresql://neondb_owner:npg_puYoPelF96Hd@ep-fancy-river-acd46jxk-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require"
+
+    # Eliminar channel_binding=require que causa problemas con psycopg2
+    if "channel_binding=require" in conn_str:
+        conn_str = conn_str.replace("channel_binding=require&", "")
+        conn_str = conn_str.replace("&channel_binding=require", "")
+        conn_str = conn_str.replace("channel_binding=require", "")
+
+    return conn_str
+
+NEON_CONNECTION_STRING = get_connection_string()
 
 def obtener_ubicaciones(tipo: Optional[str] = None) -> List[Dict[str, Any]]:
     """
