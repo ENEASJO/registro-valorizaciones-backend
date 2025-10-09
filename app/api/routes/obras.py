@@ -282,6 +282,52 @@ async def eliminar_obra(obra_id: int) -> Dict[str, Any]:
             }
         )
 
+@router.get("/test-db-connection", summary="Test database connection")
+async def test_db_connection():
+    """Test simple para verificar conexión a base de datos"""
+    try:
+        from app.core.database import database
+
+        logger.info("🧪 [TEST] Iniciando test de conexión a base de datos")
+
+        # Test 1: Verificar si está conectado
+        is_connected = database.is_connected
+        logger.info(f"🧪 [TEST] database.is_connected = {is_connected}")
+
+        # Test 2: Query simple
+        query = "SELECT 1 as test"
+        result = await database.fetch_one(query=query)
+        logger.info(f"🧪 [TEST] Query simple exitoso: {result}")
+
+        # Test 3: Contar obras
+        count_query = "SELECT COUNT(*) as total FROM obras"
+        count_result = await database.fetch_one(query=count_query)
+        logger.info(f"🧪 [TEST] Count obras: {count_result}")
+
+        return {
+            "success": True,
+            "tests": {
+                "is_connected": is_connected,
+                "simple_query": dict(result) if result else None,
+                "obras_count": dict(count_result) if count_result else None
+            },
+            "message": "Tests completados exitosamente",
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"❌ [TEST] Error en test: {str(e)}")
+        import traceback
+        logger.error(f"❌ [TEST] Traceback: {traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": True,
+                "message": f"Error en test: {str(e)}",
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+
 @router.get("/estados/opciones", summary="Obtener estados disponibles")
 async def obtener_estados_obra() -> Dict[str, Any]:
     """
