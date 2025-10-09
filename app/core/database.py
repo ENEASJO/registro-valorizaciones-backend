@@ -25,11 +25,17 @@ print(f"[STARTUP] NEON_DATABASE_URL: {NEON_DATABASE_URL[:100] if NEON_DATABASE_U
 print(f"[STARTUP] DATABASE_URL inicial: {DATABASE_URL[:100] if DATABASE_URL else 'None'}...")
 
 # Prioritizar NEON_DATABASE_URL sobre NEON_CONNECTION_STRING
+# Mantener dos variables: una para SQLAlchemy (+asyncpg) y otra para databases library (pura)
+DATABASE_URL_RAW = None  # Para databases library (formato puro)
+DATABASE_URL_SQLALCHEMY = None  # Para SQLAlchemy (con +asyncpg)
+
 if NEON_DATABASE_URL:
     print("[STARTUP] Usando NEON_DATABASE_URL")
-    DATABASE_URL = NEON_DATABASE_URL
-    if DATABASE_URL.startswith("postgresql://"):
-        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+    DATABASE_URL_RAW = NEON_DATABASE_URL
+    if NEON_DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL_SQLALCHEMY = NEON_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+    else:
+        DATABASE_URL_SQLALCHEMY = NEON_DATABASE_URL
 elif NEON_CONNECTION_STRING:
     print("[STARTUP] Usando NEON_CONNECTION_STRING")
     # Limpiar posibles prefijos de comando psql y comillas
@@ -44,17 +50,26 @@ elif NEON_CONNECTION_STRING:
     print(f"[STARTUP] connection_str después de limpiar comillas: {connection_str[:100]}...")
 
     # Convertir PostgreSQL connection string a async
+    DATABASE_URL_RAW = connection_str
     if connection_str.startswith("postgresql://"):
-        DATABASE_URL = connection_str.replace("postgresql://", "postgresql+asyncpg://")
-        print(f"[STARTUP] DATABASE_URL convertida a asyncpg: {DATABASE_URL[:100]}...")
+        DATABASE_URL_SQLALCHEMY = connection_str.replace("postgresql://", "postgresql+asyncpg://")
+        print(f"[STARTUP] DATABASE_URL_SQLALCHEMY convertida a asyncpg: {DATABASE_URL_SQLALCHEMY[:100]}...")
     else:
-        DATABASE_URL = connection_str
-        print(f"[STARTUP] DATABASE_URL sin conversión: {DATABASE_URL[:100]}...")
-elif not DATABASE_URL:
-    DATABASE_URL = "sqlite+aiosqlite:///./valoraciones.db"
+        DATABASE_URL_SQLALCHEMY = connection_str
+        print(f"[STARTUP] DATABASE_URL_SQLALCHEMY sin conversión: {DATABASE_URL_SQLALCHEMY[:100]}...")
+elif DATABASE_URL:
+    DATABASE_URL_RAW = DATABASE_URL
+    DATABASE_URL_SQLALCHEMY = DATABASE_URL
+else:
+    DATABASE_URL_RAW = "sqlite+aiosqlite:///./valoraciones.db"
+    DATABASE_URL_SQLALCHEMY = "sqlite+aiosqlite:///./valoraciones.db"
     print("[STARTUP] Usando SQLite como fallback")
 
-print(f"[STARTUP] DATABASE_URL final: {DATABASE_URL[:100] if DATABASE_URL else 'None'}...")
+# DATABASE_URL apunta a la versión SQLAlchemy por compatibilidad
+DATABASE_URL = DATABASE_URL_SQLALCHEMY
+
+print(f"[STARTUP] DATABASE_URL_RAW (databases lib): {DATABASE_URL_RAW[:100] if DATABASE_URL_RAW else 'None'}...")
+print(f"[STARTUP] DATABASE_URL_SQLALCHEMY: {DATABASE_URL_SQLALCHEMY[:100] if DATABASE_URL_SQLALCHEMY else 'None'}...")
 
 # Motor async de SQLAlchemy
 engine = create_async_engine(
@@ -72,7 +87,8 @@ async_session_maker = async_sessionmaker(
 )
 
 # Database instance para operaciones raw SQL si es necesario
-database = Database(DATABASE_URL)
+# IMPORTANTE: usar DATABASE_URL_RAW (sin +asyncpg) para databases library
+database = Database(DATABASE_URL_RAW)
 
 # Base para modelos
 from sqlalchemy.ext.declarative import declarative_base
