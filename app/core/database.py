@@ -18,20 +18,33 @@ from app.core.config import settings
 NEON_CONNECTION_STRING = os.getenv("NEON_CONNECTION_STRING")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+print(f"[STARTUP] NEON_CONNECTION_STRING: {NEON_CONNECTION_STRING[:100] if NEON_CONNECTION_STRING else 'None'}...")
+print(f"[STARTUP] DATABASE_URL inicial: {DATABASE_URL[:100] if DATABASE_URL else 'None'}...")
+
 if NEON_CONNECTION_STRING:
     # Limpiar posibles prefijos de comando psql y comillas
     connection_str = NEON_CONNECTION_STRING.strip()
+    print(f"[STARTUP] connection_str después de strip: {connection_str[:100]}...")
+
     if connection_str.startswith("psql "):
+        print("[STARTUP] Removiendo prefijo 'psql '")
         connection_str = connection_str[5:].strip()  # Remover "psql "
+
     connection_str = connection_str.strip("'\"")  # Remover comillas
+    print(f"[STARTUP] connection_str después de limpiar comillas: {connection_str[:100]}...")
 
     # Convertir PostgreSQL connection string a async
     if connection_str.startswith("postgresql://"):
         DATABASE_URL = connection_str.replace("postgresql://", "postgresql+asyncpg://")
+        print(f"[STARTUP] DATABASE_URL convertida a asyncpg: {DATABASE_URL[:100]}...")
     else:
         DATABASE_URL = connection_str
+        print(f"[STARTUP] DATABASE_URL sin conversión: {DATABASE_URL[:100]}...")
 elif not DATABASE_URL:
     DATABASE_URL = "sqlite+aiosqlite:///./valoraciones.db"
+    print("[STARTUP] Usando SQLite como fallback")
+
+print(f"[STARTUP] DATABASE_URL final: {DATABASE_URL[:100] if DATABASE_URL else 'None'}...")
 
 # Motor async de SQLAlchemy
 engine = create_async_engine(
