@@ -22,13 +22,42 @@ class ObraServiceNeon:
     async def _get_connection():
         """Obtener conexión a la base de datos"""
         database_url = get_database_url()
-        logger.info(f"🔌 Conectando a base de datos: {database_url[:50]}...")
+        logger.info(f"🔌 Conectando a base de datos: {database_url[:80]}...")
         try:
-            conn = await asyncpg.connect(database_url)
+            # asyncpg requiere SSL parameters como argumentos, no en la URL
+            # Remover parámetros de query de la URL y pasarlos como kwargs
+            import urllib.parse
+            parsed = urllib.parse.urlparse(database_url)
+            query_params = urllib.parse.parse_qs(parsed.query)
+
+            # Reconstruir URL sin query parameters
+            clean_url = urllib.parse.urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                parsed.params,
+                '',  # query vacío
+                parsed.fragment
+            ))
+
+            # Preparar argumentos de conexión
+            conn_kwargs = {}
+            if 'sslmode' in query_params:
+                sslmode = query_params['sslmode'][0]
+                if sslmode == 'require':
+                    conn_kwargs['ssl'] = 'require'
+
+            logger.info(f"🔌 URL limpia: {clean_url[:80]}...")
+            logger.info(f"🔌 SSL kwargs: {conn_kwargs}")
+
+            conn = await asyncpg.connect(clean_url, **conn_kwargs)
             logger.info("✅ Conexión exitosa a base de datos")
             return conn
         except Exception as e:
             logger.error(f"❌ Error conectando a base de datos: {str(e)}")
+            logger.error(f"❌ Tipo de error: {type(e).__name__}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             raise
     
     @staticmethod
