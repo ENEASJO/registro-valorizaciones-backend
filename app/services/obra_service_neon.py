@@ -5,11 +5,10 @@ import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from decimal import Decimal
-import asyncpg
 
 from app.models.obra import ObraCreate, ObraUpdate, ObraResponse
 from app.utils.codigo_generator import CodigoGenerator
-from app.core.database import get_database_url
+from app.core.database import database  # Usar la instancia de databases
 from app.utils.exceptions import ValidationException
 import uuid
 
@@ -17,48 +16,8 @@ logger = logging.getLogger(__name__)
 
 class ObraServiceNeon:
     """Servicio para gestión de obras usando Neon PostgreSQL"""
-    
-    @staticmethod
-    async def _get_connection():
-        """Obtener conexión a la base de datos"""
-        database_url = get_database_url()
-        logger.info(f"🔌 Conectando a base de datos: {database_url[:80]}...")
-        try:
-            # asyncpg requiere SSL parameters como argumentos, no en la URL
-            # Remover parámetros de query de la URL y pasarlos como kwargs
-            import urllib.parse
-            parsed = urllib.parse.urlparse(database_url)
-            query_params = urllib.parse.parse_qs(parsed.query)
 
-            # Reconstruir URL sin query parameters
-            clean_url = urllib.parse.urlunparse((
-                parsed.scheme,
-                parsed.netloc,
-                parsed.path,
-                parsed.params,
-                '',  # query vacío
-                parsed.fragment
-            ))
-
-            # Preparar argumentos de conexión
-            conn_kwargs = {}
-            if 'sslmode' in query_params:
-                sslmode = query_params['sslmode'][0]
-                if sslmode == 'require':
-                    conn_kwargs['ssl'] = 'require'
-
-            logger.info(f"🔌 URL limpia: {clean_url[:80]}...")
-            logger.info(f"🔌 SSL kwargs: {conn_kwargs}")
-
-            conn = await asyncpg.connect(clean_url, **conn_kwargs)
-            logger.info("✅ Conexión exitosa a base de datos")
-            return conn
-        except Exception as e:
-            logger.error(f"❌ Error conectando a base de datos: {str(e)}")
-            logger.error(f"❌ Tipo de error: {type(e).__name__}")
-            import traceback
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
-            raise
+    # Ya no necesitamos _get_connection(), usamos database directamente
     
     @staticmethod
     async def crear_obra(obra_data: ObraCreate) -> Dict[str, Any]:
@@ -214,51 +173,46 @@ class ObraServiceNeon:
     ) -> List[Dict[str, Any]]:
         """Listar obras con filtros"""
         try:
-            conn = await ObraServiceNeon._get_connection()
-            try:
-                # Construir query dinámicamente
-                where_conditions = ["o.activo = true"]
-                params = []
-                param_count = 0
-                
-                if empresa_id:
-                    param_count += 1
-                    where_conditions.append(f"o.empresa_id = ${param_count}")
-                    params.append(empresa_id)
-                
-                if estado:
-                    param_count += 1
-                    where_conditions.append(f"o.estado_obra = ${param_count}")
-                    params.append(estado.upper())
-                
-                param_count += 1
-                params.append(limit)
-                limit_clause = f"${param_count}"
-                
-                param_count += 1
-                params.append(offset)
-                offset_clause = f"${param_count}"
-                
-                where_clause = " AND ".join(where_conditions)
-                
-                query = f"""
-                    SELECT o.*, e.razon_social as empresa_nombre
-                    FROM obras o
-                    JOIN empresas e ON o.empresa_id = e.id
-                    WHERE {where_clause}
-                    ORDER BY o.created_at DESC
-                    LIMIT {limit_clause} OFFSET {offset_clause}
-                """
-                
-                obras = await conn.fetch(query, *params)
-                
-                return [dict(obra) for obra in obras]
-                
-            finally:
-                await conn.close()
-                
+            # Construir query dinámicamente con placeholders :param_name
+            where_conditions = ["o.activo = true"]
+            values = {}
+
+            if empresa_id:
+                where_conditions.append("o.empresa_id = :empresa_id")
+                values["empresa_id"] = empresa_id
+
+            if estado:
+                where_conditions.append("o.estado_obra = :estado")
+                values["estado"] = estado.upper()
+
+            values["limit"] = limit
+            values["offset"] = offset
+
+            where_clause = " AND ".join(where_conditions)
+
+            query = f"""
+                SELECT o.*, e.razon_social as empresa_nombre
+                FROM obras o
+                JOIN empresas e ON o.empresa_id = e.id
+                WHERE {where_clause}
+                ORDER BY o.created_at DESC
+                LIMIT :limit OFFSET :offset
+            """
+
+            logger.info(f"🔍 Ejecutando query: {query[:100]}...")
+            logger.info(f"🔍 Parámetros: {values}")
+
+            obras = await database.fetch_all(query=query, values=values)
+
+            logger.info(f"✅ Se encontraron {len(obras)} obras")
+
+            return [dict(obra) for obra in obras]
+
         except Exception as e:
             logger.error(f"❌ Error listando obras: {str(e)}")
+            logger.error(f"❌ Tipo: {type(e).__name__}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return []
     
     @staticmethod
