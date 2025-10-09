@@ -14,7 +14,7 @@ from app.utils.exceptions import ValidationException
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/obras",
+    prefix="/api/v1/obras",
     tags=["Obras"],
     responses={
         400: {"description": "Error de validación"},
