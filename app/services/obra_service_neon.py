@@ -128,7 +128,7 @@ class ObraServiceNeon:
             conn = await ObraServiceNeon._get_connection()
             try:
                 obra = await conn.fetchrow("""
-                    SELECT o.*, e.nombre as empresa_nombre
+                    SELECT o.*, e.razon_social as empresa_nombre
                     FROM obras o
                     JOIN empresas e ON o.empresa_id = e.id
                     WHERE o.id = $1 AND o.activo = true
@@ -152,7 +152,7 @@ class ObraServiceNeon:
             conn = await ObraServiceNeon._get_connection()
             try:
                 obra = await conn.fetchrow("""
-                    SELECT o.*, e.nombre as empresa_nombre
+                    SELECT o.*, e.razon_social as empresa_nombre
                     FROM obras o
                     JOIN empresas e ON o.empresa_id = e.id
                     WHERE o.codigo = $1 AND o.activo = true
@@ -206,7 +206,7 @@ class ObraServiceNeon:
                 where_clause = " AND ".join(where_conditions)
                 
                 query = f"""
-                    SELECT o.*, e.nombre as empresa_nombre
+                    SELECT o.*, e.razon_social as empresa_nombre
                     FROM obras o
                     JOIN empresas e ON o.empresa_id = e.id
                     WHERE {where_clause}
