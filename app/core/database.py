@@ -125,8 +125,12 @@ async def execute_in_transaction(func, *args, **kwargs):
 def get_database_url() -> str:
     """
     Obtener la URL de la base de datos configurada
-    
+
     Returns:
-        str: URL de conexión a la base de datos
+        str: URL de conexión a la base de datos (formato asyncpg puro)
     """
-    return DATABASE_URL
+    # Convertir de vuelta a formato asyncpg puro si tiene +asyncpg
+    url = DATABASE_URL
+    if url and '+asyncpg://' in url:
+        url = url.replace('postgresql+asyncpg://', 'postgresql://')
+    return url
