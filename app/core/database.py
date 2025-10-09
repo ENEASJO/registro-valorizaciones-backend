@@ -19,11 +19,17 @@ NEON_CONNECTION_STRING = os.getenv("NEON_CONNECTION_STRING")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if NEON_CONNECTION_STRING:
+    # Limpiar posibles prefijos de comando psql y comillas
+    connection_str = NEON_CONNECTION_STRING.strip()
+    if connection_str.startswith("psql "):
+        connection_str = connection_str[5:].strip()  # Remover "psql "
+    connection_str = connection_str.strip("'\"")  # Remover comillas
+
     # Convertir PostgreSQL connection string a async
-    if NEON_CONNECTION_STRING.startswith("postgresql://"):
-        DATABASE_URL = NEON_CONNECTION_STRING.replace("postgresql://", "postgresql+asyncpg://")
+    if connection_str.startswith("postgresql://"):
+        DATABASE_URL = connection_str.replace("postgresql://", "postgresql+asyncpg://")
     else:
-        DATABASE_URL = NEON_CONNECTION_STRING
+        DATABASE_URL = connection_str
 elif not DATABASE_URL:
     DATABASE_URL = "sqlite+aiosqlite:///./valoraciones.db"
 
