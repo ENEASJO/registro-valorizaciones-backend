@@ -18,7 +18,12 @@ class ObraServiceNeon:
     """Servicio para gestión de obras usando Neon PostgreSQL"""
 
     # Ya no necesitamos _get_connection(), usamos database directamente
-    
+    # Pero dejamos un stub para que no falle si otros métodos lo llaman
+    @staticmethod
+    async def _get_connection():
+        """DEPRECATED: Este método ya no se usa, pero se mantiene para compatibilidad"""
+        raise NotImplementedError("Este método ha sido reemplazado por el uso directo de database")
+
     @staticmethod
     async def crear_obra(obra_data: ObraCreate) -> Dict[str, Any]:
         """
