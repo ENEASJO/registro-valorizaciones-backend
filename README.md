@@ -276,3 +276,4 @@ Este es un sistema especializado para administración pública municipal. Las co
 ---
 
 **Desarrollado con ❤️ para el desarrollo municipal del Distrito de San Marcos** 🏔️
+
