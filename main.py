@@ -79,6 +79,17 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Cargar router de plantel profesional
+try:
+    print("[LOADING] Cargando router de plantel profesional...")
+    from app.api.routes.plantel import router as plantel_router
+    app.include_router(plantel_router)
+    print("[OK] Router de plantel profesional cargado exitosamente")
+except Exception as e:
+    print(f"[WARNING] No se pudo cargar router de plantel profesional: {e}")
+    import traceback
+    traceback.print_exc()
+
 # Cargar router de obras MEF
 try:
     print("[LOADING] Cargando router de obras MEF...")
