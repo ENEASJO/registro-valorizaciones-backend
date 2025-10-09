@@ -15,8 +15,8 @@ router = APIRouter()
 class DatosContrato(BaseModel):
     numero_contrato: str
     fecha_contrato: date
-    plazo_ejecucion_dias: int
-    monto_contratado: float
+    plazo_ejecucion_dias: Optional[int] = None
+    monto_contratado: Optional[float] = None
 
 
 class Ubicacion(BaseModel):
