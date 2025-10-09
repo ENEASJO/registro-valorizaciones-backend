@@ -57,10 +57,13 @@ class ObraUpdate(BaseModel):
 async def crear_obra(obra: ObraCreate):
     """Crea una nueva obra, importando datos de MEF si es necesario"""
     try:
-        # Si importar_mef es True, consultar MEF
+        # Usar datos_mef proporcionados por el frontend (scraping local)
         datos_mef = obra.datos_mef
+
+        # Solo consultar MEF desde backend si explícitamente se solicita Y no hay datos
+        # NOTA: El frontend hace scraping local, así que esto normalmente no se ejecuta
         if obra.importar_mef and not datos_mef:
-            # Consultar datos de MEF
+            # Consultar datos de MEF (puede ser lento en Railway)
             mef_response = await consultar_cui_mef(obra.cui)
             if mef_response.get("success"):
                 datos_mef = mef_response.get("data")
@@ -73,7 +76,7 @@ async def crear_obra(obra: ObraCreate):
         if not datos_mef:
             raise HTTPException(
                 status_code=400,
-                detail="Se requieren datos MEF para crear la obra"
+                detail="Se requieren datos MEF para crear la obra. El frontend debe hacer scraping local y enviar datos_mef."
             )
 
         # Extraer coordenadas si existen
