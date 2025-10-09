@@ -158,20 +158,24 @@ async def listar_obras(
 ) -> Dict[str, Any]:
     """
     Listar obras con filtros opcionales
-    
+
     - **empresa_id**: Filtrar por empresa ejecutora
     - **estado**: Filtrar por estado de obra
     - **limit**: Número máximo de resultados (1-100)
     - **offset**: Número de registros a saltar
     """
     try:
+        logger.info(f"🎯 [ENDPOINT] Listar obras llamado con empresa_id={empresa_id}, estado={estado}, limit={limit}, offset={offset}")
+
         obras = await ObraServiceNeon.listar_obras(
             empresa_id=empresa_id,
             estado=estado,
             limit=limit,
             offset=offset
         )
-        
+
+        logger.info(f"✅ [ENDPOINT] Obtenidas {len(obras)} obras del servicio")
+
         return {
             "success": True,
             "data": {
@@ -182,9 +186,12 @@ async def listar_obras(
             },
             "timestamp": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
-        logger.error(f"❌ Error listando obras: {str(e)}")
+        logger.error(f"❌ [ENDPOINT] Error listando obras: {str(e)}")
+        logger.error(f"❌ [ENDPOINT] Tipo: {type(e).__name__}")
+        import traceback
+        logger.error(f"❌ [ENDPOINT] Traceback: {traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
             content={
