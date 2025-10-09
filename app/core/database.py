@@ -137,6 +137,8 @@ def get_database_url() -> str:
     """
     # Convertir de vuelta a formato asyncpg puro si tiene +asyncpg
     url = DATABASE_URL
+    print(f"[DEBUG] DATABASE_URL original: {url[:80] if url else 'None'}...")
     if url and '+asyncpg://' in url:
         url = url.replace('postgresql+asyncpg://', 'postgresql://')
+        print(f"[DEBUG] URL después de conversión: {url[:80]}...")
     return url

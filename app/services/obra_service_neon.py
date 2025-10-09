@@ -22,7 +22,14 @@ class ObraServiceNeon:
     async def _get_connection():
         """Obtener conexión a la base de datos"""
         database_url = get_database_url()
-        return await asyncpg.connect(database_url)
+        logger.info(f"🔌 Conectando a base de datos: {database_url[:50]}...")
+        try:
+            conn = await asyncpg.connect(database_url)
+            logger.info("✅ Conexión exitosa a base de datos")
+            return conn
+        except Exception as e:
+            logger.error(f"❌ Error conectando a base de datos: {str(e)}")
+            raise
     
     @staticmethod
     async def crear_obra(obra_data: ObraCreate) -> Dict[str, Any]:
