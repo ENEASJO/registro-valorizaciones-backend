@@ -15,13 +15,23 @@ from databases import Database
 from app.core.config import settings
 
 # Database URL con soporte async - Prioritiza Neon
+# Revisar múltiples variables de entorno en orden de prioridad
 NEON_CONNECTION_STRING = os.getenv("NEON_CONNECTION_STRING")
+NEON_DATABASE_URL = os.getenv("NEON_DATABASE_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 print(f"[STARTUP] NEON_CONNECTION_STRING: {NEON_CONNECTION_STRING[:100] if NEON_CONNECTION_STRING else 'None'}...")
+print(f"[STARTUP] NEON_DATABASE_URL: {NEON_DATABASE_URL[:100] if NEON_DATABASE_URL else 'None'}...")
 print(f"[STARTUP] DATABASE_URL inicial: {DATABASE_URL[:100] if DATABASE_URL else 'None'}...")
 
-if NEON_CONNECTION_STRING:
+# Prioritizar NEON_DATABASE_URL sobre NEON_CONNECTION_STRING
+if NEON_DATABASE_URL:
+    print("[STARTUP] Usando NEON_DATABASE_URL")
+    DATABASE_URL = NEON_DATABASE_URL
+    if DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+elif NEON_CONNECTION_STRING:
+    print("[STARTUP] Usando NEON_CONNECTION_STRING")
     # Limpiar posibles prefijos de comando psql y comillas
     connection_str = NEON_CONNECTION_STRING.strip()
     print(f"[STARTUP] connection_str después de strip: {connection_str[:100]}...")
