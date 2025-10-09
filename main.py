@@ -171,11 +171,34 @@ async def startup_event():
     # Docstring convertido a comentario
     try:
         print("[STARTING] Iniciando aplicación FastAPI...")
+
+        # Conectar la instancia database de databases library
+        from app.core.database import database
+        if not database.is_connected:
+            await database.connect()
+            print("[OK] Database instance conectada globalmente")
+
         print("[OK] Startup completado exitosamente")
     except Exception as e:
         print(f"[ERROR] Error crítico en startup: {e}")
         import traceback
         traceback.print_exc()
+
+# Evento de shutdown
+@app.on_event("shutdown")
+async def shutdown_event():
+    try:
+        print("[SHUTDOWN] Cerrando aplicación FastAPI...")
+
+        # Desconectar la instancia database de databases library
+        from app.core.database import database
+        if database.is_connected:
+            await database.disconnect()
+            print("[OK] Database instance desconectada")
+
+        print("[OK] Shutdown completado exitosamente")
+    except Exception as e:
+        print(f"[WARNING] Error en shutdown: {e}")
 
 # Variable global para Playwright helper (lazy loading)
 _playwright_helper = None
