@@ -12,7 +12,11 @@ logger = logging.getLogger(__name__)
 
 def get_database_url():
     """Obtener URL de conexión a la base de datos"""
-    return os.getenv("NEON_CONNECTION_STRING") or os.getenv("DATABASE_URL")
+    return (
+        os.getenv("NEON_DATABASE_URL") or
+        os.getenv("NEON_CONNECTION_STRING") or
+        os.getenv("DATABASE_URL")
+    )
 
 class ObrasMEFService:
     """Servicio para operaciones CRUD de obras con datos MEF"""
