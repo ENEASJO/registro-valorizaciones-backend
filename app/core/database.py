@@ -3,6 +3,10 @@ Configuración de la base de datos
 """
 import os
 from typing import AsyncGenerator
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 try:
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 except ImportError:
