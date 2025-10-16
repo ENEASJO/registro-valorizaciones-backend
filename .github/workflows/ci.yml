@@ -38,7 +38,7 @@ jobs:
         pytest -v -m "not integration"
       env:
         PYTHONPATH: ${{ github.workspace }}
-        NEON_CONNECTION_STRING: postgresql://test:test@localhost:5432/test
+        NEON_DATABASE_URL: postgresql://test:test@localhost:5432/test
 
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -88,4 +88,4 @@ jobs:
           --cpu 2 \
           --timeout 900s \
           --max-instances 10 \
-          --set-env-vars NEON_CONNECTION_STRING=${{ secrets.NEON_CONNECTION_STRING }}
+          --set-env-vars NEON_DATABASE_URL=${{ secrets.NEON_DATABASE_URL }}
