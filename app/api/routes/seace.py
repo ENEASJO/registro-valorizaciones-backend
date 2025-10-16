@@ -11,8 +11,12 @@ from app.models.seace import SEACEInput, ObraSEACE, ErrorResponseSEACE
 from app.services.seace_service import seace_service
 from app.services.job_manager import job_manager, JobStatus
 from app.utils.exceptions import BaseAppException
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Configuración de la aplicación
+settings = get_settings()
 
 
 async def process_seace_job(job_id: str, cui: str, anio: int):
@@ -21,7 +25,15 @@ async def process_seace_job(job_id: str, cui: str, anio: int):
         logger.info(f"Iniciando procesamiento de job {job_id} para CUI {cui}, año {anio}")
         job_manager.update_status(job_id, JobStatus.RUNNING)
 
-        # Ejecutar scraping
+        # Verificar si scraping SEACE está habilitado
+        if not settings.can_scrape_seace():
+            error_msg = "Scraping de SEACE deshabilitado en este entorno (Railway)"
+            error_details = "El scraping de SEACE está deshabilitado en Railway. Contacta al administrador."
+            logger.warning(f"[JOB {job_id}] {error_msg}")
+            job_manager.set_error(job_id, error_msg, error_details)
+            return
+
+        # Ejecutar scraping (solo si está habilitado)
         resultado = await seace_service.consultar_obra(cui, anio)
 
         # Guardar resultado
@@ -67,6 +79,22 @@ async def consultar_obra_seace_async(seace_input: SEACEInput, background_tasks: 
     - message: Mensaje informativo
     """
     try:
+        # Verificar si scraping SEACE está habilitado
+        if not settings.can_scrape_seace():
+            logger.warning(f"[SEACE ASYNC] Intento de crear job para CUI {seace_input.cui} con scraping deshabilitado (Railway)")
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": True,
+                    "message": "Scraping de SEACE no disponible en este entorno",
+                    "cui": seace_input.cui,
+                    "anio": seace_input.anio,
+                    "info": "El scraping de SEACE está deshabilitado en Railway debido a restricciones de acceso. "
+                           "No se pueden crear jobs de scraping en este entorno.",
+                    "environment": "Railway" if settings.is_railway() else "Unknown"
+                }
+            )
+
         # Crear job
         job_id = job_manager.create_job(seace_input.cui, seace_input.anio)
 
@@ -172,9 +200,26 @@ async def consultar_obra_seace(seace_input: SEACEInput) -> ObraSEACE:
     - Información adicional (entidad convocante, fecha de publicación, etc.)
     """
     try:
+        # Verificar si scraping SEACE está habilitado
+        if not settings.can_scrape_seace():
+            logger.warning(f"[SEACE] Intento de scraping para CUI {seace_input.cui} con scraping deshabilitado (Railway)")
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": True,
+                    "message": "Scraping de SEACE no disponible en este entorno",
+                    "cui": seace_input.cui,
+                    "anio": seace_input.anio,
+                    "info": "El scraping de SEACE está deshabilitado en Railway debido a restricciones de acceso. "
+                           "Contacta al administrador del sistema para obtener estos datos.",
+                    "environment": "Railway" if settings.is_railway() else "Unknown",
+                    "recommendation": "Este endpoint no funciona en el entorno de producción Railway"
+                }
+            )
+
         logger.info(f"Iniciando consulta SEACE para CUI: {seace_input.cui}, Año: {seace_input.anio}")
 
-        # Consultar obra usando el servicio SEACE
+        # Consultar obra usando el servicio SEACE (solo si está habilitado)
         obra_info = await seace_service.consultar_obra(seace_input.cui, seace_input.anio)
 
         logger.info(f"Consulta SEACE exitosa para CUI {seace_input.cui}: {obra_info.nomenclatura}")

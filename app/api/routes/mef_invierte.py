@@ -11,11 +11,16 @@ from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
 import logging
 import os
+import json
 from databases import Database
 
 from app.services.mef_invierte_service import consultar_cui_mef, consultar_cui_mef_con_nombre
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Configuración de la aplicación
+settings = get_settings()
 
 # IPs autorizadas para hacer scraping real (solo administrador)
 ADMIN_IPS = [ip.strip() for ip in os.getenv("ADMIN_IPS", "127.0.0.1").split(",")]
@@ -133,7 +138,7 @@ async def actualizar_mef_scraping(mef_input: MEFInvierteInput, request: Request)
                         """,
                         {
                             "cui": mef_input.cui,
-                            "datos_mef": str(resultado)  # Convertir dict a JSON string
+                            "datos_mef": json.dumps(resultado)  # Convertir dict a JSON válido
                         }
                     )
                     logger.info(f"[ADMIN SCRAPING] Datos MEF actualizados en BD para CUI {mef_input.cui}")
@@ -286,10 +291,27 @@ async def consultar_mef_cache(cui: str) -> Dict[str, Any]:
                 }
             }
 
-        # Si NO hay datos en caché, hacer scraping automático
+        # Si NO hay datos en caché, verificar si scraping está habilitado
+        if not settings.can_scrape_mef():
+            logger.warning(f"[CONSULTA MEF] ⚠️ CUI {cui} no encontrado en caché y scraping MEF deshabilitado (Railway)")
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": True,
+                    "found": False,
+                    "message": "Datos MEF no disponibles en caché",
+                    "cui": cui,
+                    "info": "El scraping de MEF Invierte está deshabilitado en este entorno (Railway). "
+                           "Los datos deben ser pre-cargados localmente por el administrador usando el endpoint /actualizar. "
+                           "Contacta al administrador del sistema para obtener estos datos.",
+                    "environment": "Railway" if settings.is_railway() else "Unknown",
+                    "recommendation": "Solicitar al administrador que ejecute scraping desde su IP autorizada y guarde los datos en caché"
+                }
+            )
+
         logger.info(f"[CONSULTA MEF] 🔍 No hay datos en caché. Iniciando scraping automático para CUI {cui}")
 
-        # Hacer scraping
+        # Hacer scraping (solo si está habilitado, ej: ambiente local)
         resultado = await consultar_cui_mef(cui)
 
         if not resultado.get("success"):
@@ -467,6 +489,313 @@ async def health_check_mef(request: Request) -> Dict[str, Any]:
     }
 
 
+@router.delete(
+    "/eliminar/{cui}",
+    summary="[ADMIN] Eliminar CUI del caché Neon",
+    description="⚠️ ENDPOINT PROTEGIDO - Solo IP autorizada. Elimina un CUI de la tabla mef_cache.",
+    response_description="Confirmación de eliminación"
+)
+async def eliminar_cui_cache(cui: str, request: Request) -> Dict[str, Any]:
+    """
+    🔒 ENDPOINT PROTEGIDO - Solo administrador con IP autorizada
+
+    Elimina un CUI de la tabla mef_cache de Neon PostgreSQL.
+    Usado cuando:
+    - Quieres limpiar datos scraped erróneos
+    - Necesitas liberar espacio en caché
+    - Quieres forzar un nuevo scraping la próxima vez
+
+    ⚠️ IMPORTANTE: Este endpoint solo funciona desde IPs autorizadas.
+
+    - **cui**: Código Único de Inversiones a eliminar (ejemplo: "2595080")
+
+    Retorna:
+    - Confirmación de eliminación
+    - CUI eliminado
+    - Timestamp de la operación
+    """
+    # Obtener IP real del cliente
+    client_ip = request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP", request.client.host))
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+
+    # Verificar IP autorizada
+    if client_ip not in ADMIN_IPS:
+        logger.warning(f"Intento de eliminación desde IP no autorizada: {client_ip}")
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": True,
+                "message": "Eliminación solo disponible para administradores",
+                "info": "Este endpoint requiere IP autorizada",
+                "client_ip": client_ip
+            }
+        )
+
+    try:
+        if not database:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": True,
+                    "message": "Base de datos no configurada"
+                }
+            )
+
+        logger.info(f"[ADMIN DELETE] Eliminando CUI {cui} del caché desde IP {client_ip}")
+
+        # Verificar si existe en mef_cache
+        cache_exists = await database.fetch_one(
+            "SELECT cui FROM mef_cache WHERE cui = :cui",
+            {"cui": cui}
+        )
+
+        if not cache_exists:
+            logger.warning(f"[ADMIN DELETE] CUI {cui} no encontrado en mef_cache")
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": True,
+                    "message": f"CUI {cui} no encontrado en caché",
+                    "cui": cui
+                }
+            )
+
+        # Eliminar del caché
+        await database.execute(
+            "DELETE FROM mef_cache WHERE cui = :cui",
+            {"cui": cui}
+        )
+
+        logger.info(f"[ADMIN DELETE] CUI {cui} eliminado exitosamente del caché")
+
+        return {
+            "success": True,
+            "message": f"CUI {cui} eliminado exitosamente del caché",
+            "cui": cui,
+            "deleted_from": "mef_cache",
+            "deleted_by_ip": client_ip,
+            "timestamp": str(os.popen('date -Iseconds').read().strip())
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"[ADMIN DELETE] Error eliminando CUI {cui}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": True,
+                "message": "Error al eliminar CUI del caché",
+                "details": str(e),
+                "cui": cui
+            }
+        )
+
+
+@router.post(
+    "/guardar-cache/{cui}",
+    summary="[ADMIN] Guardar CUI en caché Neon",
+    description="⚠️ ENDPOINT PROTEGIDO - Solo IP autorizada. Guarda datos MEF scraped en mef_cache.",
+    response_description="Confirmación de guardado en caché"
+)
+async def guardar_cui_cache(cui: str, request: Request) -> Dict[str, Any]:
+    """
+    🔒 ENDPOINT PROTEGIDO - Solo administrador con IP autorizada
+
+    Hace scraping de MEF y guarda en tabla mef_cache de Neon PostgreSQL.
+    Usado cuando:
+    - Quieres pre-cachear datos para uso futuro
+    - Preparas datos antes de crear una obra
+    - Necesitas tener datos disponibles offline
+
+    ⚠️ IMPORTANTE: Este endpoint solo funciona desde IPs autorizadas.
+
+    - **cui**: Código Único de Inversiones a guardar (ejemplo: "2595080")
+
+    Retorna:
+    - Datos scraped
+    - Confirmación de guardado
+    - Timestamp de la operación
+    """
+    # Obtener IP real del cliente
+    client_ip = request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP", request.client.host))
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+
+    # Verificar IP autorizada
+    if client_ip not in ADMIN_IPS:
+        logger.warning(f"Intento de guardado desde IP no autorizada: {client_ip}")
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": True,
+                "message": "Guardado en caché solo disponible para administradores",
+                "info": "Este endpoint requiere IP autorizada",
+                "client_ip": client_ip
+            }
+        )
+
+    try:
+        if not database:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": True,
+                    "message": "Base de datos no configurada"
+                }
+            )
+
+        logger.info(f"[ADMIN CACHE] Guardando CUI {cui} en caché desde IP {client_ip}")
+
+        # Hacer scraping
+        resultado = await consultar_cui_mef(cui)
+
+        if not resultado.get("success"):
+            logger.warning(f"[ADMIN CACHE] No se encontró inversión para CUI {cui}")
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": True,
+                    "message": resultado.get("error", "No se encontró información en MEF"),
+                    "cui": cui,
+                    "fuente": "MEF Invierte"
+                }
+            )
+
+        # Verificar si ya existe en caché
+        cache_exists = await database.fetch_one(
+            "SELECT cui FROM mef_cache WHERE cui = :cui",
+            {"cui": cui}
+        )
+
+        # Preparar datos MEF para guardar
+        datos_mef_json = json.dumps(resultado.get("data"))
+
+        if cache_exists:
+            # Actualizar caché existente
+            await database.execute(
+                """
+                UPDATE mef_cache
+                SET
+                    datos_mef = :datos_mef,
+                    ultima_actualizacion = NOW()
+                WHERE cui = :cui
+                """,
+                {
+                    "cui": cui,
+                    "datos_mef": datos_mef_json
+                }
+            )
+            logger.info(f"[ADMIN CACHE] CUI {cui} actualizado en caché")
+            db_action = "updated"
+        else:
+            # Insertar nuevo en caché
+            await database.execute(
+                """
+                INSERT INTO mef_cache (cui, datos_mef, fecha_scraping, ultima_actualizacion)
+                VALUES (:cui, :datos_mef, NOW(), NOW())
+                """,
+                {
+                    "cui": cui,
+                    "datos_mef": datos_mef_json
+                }
+            )
+            logger.info(f"[ADMIN CACHE] CUI {cui} guardado en caché")
+            db_action = "created"
+
+        return {
+            "success": True,
+            "message": f"CUI {cui} guardado exitosamente en caché Neon",
+            "cui": cui,
+            "data": resultado.get("data"),
+            "cache_action": db_action,
+            "saved_by_ip": client_ip,
+            "timestamp": str(os.popen('date -Iseconds').read().strip())
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"[ADMIN CACHE] Error guardando CUI {cui}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": True,
+                "message": "Error al guardar CUI en caché",
+                "details": str(e),
+                "cui": cui
+            }
+        )
+
+
+@router.get(
+    "/verificar/{cui}",
+    summary="Verificar si CUI existe en caché Neon",
+    description="Verifica rápidamente si un CUI existe en el caché sin retornar todos los datos",
+    response_description="Información de existencia del CUI"
+)
+async def verificar_cui_cache(cui: str) -> Dict[str, Any]:
+    """
+    Verifica si un CUI existe en la tabla mef_cache de Neon PostgreSQL.
+
+    - **cui**: Código Único de Inversiones a verificar (ejemplo: "2595080")
+
+    Retorna:
+    - exists: true/false
+    - cui: El CUI consultado
+    - info: Información adicional si existe
+    """
+    try:
+        if not database:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": True,
+                    "message": "Base de datos no configurada"
+                }
+            )
+
+        # Verificar si existe en mef_cache
+        cache_data = await database.fetch_one(
+            "SELECT cui, fecha_scraping, ultima_actualizacion FROM mef_cache WHERE cui = :cui",
+            {"cui": cui}
+        )
+
+        if cache_data:
+            return {
+                "success": True,
+                "exists": True,
+                "cui": cui,
+                "info": {
+                    "fecha_scraping": str(cache_data['fecha_scraping']) if cache_data['fecha_scraping'] else None,
+                    "ultima_actualizacion": str(cache_data['ultima_actualizacion']) if cache_data['ultima_actualizacion'] else None,
+                    "fuente": "Caché Neon (mef_cache)"
+                }
+            }
+        else:
+            return {
+                "success": True,
+                "exists": False,
+                "cui": cui,
+                "message": f"CUI {cui} no encontrado en caché"
+            }
+
+    except Exception as e:
+        logger.error(f"[VERIFICAR] Error verificando CUI {cui}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": True,
+                "message": "Error al verificar CUI",
+                "details": str(e),
+                "cui": cui
+            }
+        )
+
+
 @router.get(
     "/info",
     summary="Información del API MEF Invierte",
@@ -490,6 +819,9 @@ async def api_info_mef() -> Dict[str, Any]:
             "GET /api/v1/mef-invierte/consultar/{cui}": "📖 [PÚBLICO] Consultar datos desde caché",
             "POST /api/v1/mef-invierte/consultar": "⚠️ [LEGACY] Redirige según IP",
             "POST /api/v1/mef-invierte/buscar": "Buscar inversiones por CUI y/o nombre",
+            "POST /api/v1/mef-invierte/guardar-cache/{cui}": "🔒 [ADMIN] Guardar CUI en caché Neon",
+            "DELETE /api/v1/mef-invierte/eliminar/{cui}": "🔒 [ADMIN] Eliminar CUI del caché",
+            "GET /api/v1/mef-invierte/verificar/{cui}": "Verificar si CUI existe en caché",
             "GET /api/v1/mef-invierte/health": "Verificar estado del servicio",
             "GET /api/v1/mef-invierte/info": "Información del API"
         },

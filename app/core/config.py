@@ -48,6 +48,21 @@ class Settings(BaseSettings):
     
     # Configuración de logging
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
+
+    # Configuración de ambiente (Railway detection)
+    RAILWAY_ENVIRONMENT: str | None = Field(default=None, env="RAILWAY_ENVIRONMENT")
+
+    # Control de scraping por servicio
+    ENABLE_SEACE_SCRAPING: bool = Field(
+        default=True,
+        env="ENABLE_SEACE_SCRAPING",
+        description="Habilitar scraping SEACE (deshabilitar en Railway)"
+    )
+    ENABLE_MEF_SCRAPING: bool = Field(
+        default=True,
+        env="ENABLE_MEF_SCRAPING",
+        description="Habilitar scraping MEF Invierte (deshabilitar en Railway)"
+    )
     LOG_FORMAT: str = Field(
         default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         env="LOG_FORMAT"
@@ -172,6 +187,18 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Verificar si está en modo producción"""
         return not self.DEBUG and not self.RELOAD
+
+    def is_railway(self) -> bool:
+        """Verificar si está corriendo en Railway"""
+        return self.RAILWAY_ENVIRONMENT is not None
+
+    def can_scrape_seace(self) -> bool:
+        """Verificar si el scraping de SEACE está habilitado"""
+        return self.ENABLE_SEACE_SCRAPING
+
+    def can_scrape_mef(self) -> bool:
+        """Verificar si el scraping de MEF Invierte está habilitado"""
+        return self.ENABLE_MEF_SCRAPING
 
     def get_app_info(self) -> dict:
         """Obtener información de la aplicación"""
